@@ -1,0 +1,15 @@
+﻿nk,other_nk,device_ID,mass,mass_type,gain_loss
+252152,279112,BJ091,23.2,initial,gain
+252144,279172,BJ090,18.3,initial,gain
+252156,279121,BJ112,23.1,initial,gain
+252148,NA,BJ104,17.5,initial,gain
+252158,279105,BJ105,25.8,initial,loss
+252118,279140,BC377,24.5,initial,loss
+252134,NA,BJ085,25.4,initial,loss
+252152,279112,BJ091,24.2,recapture,gain
+252144,279172,BJ090,24.1,recapture,gain
+252156,279121,BJ112,24.2,recapture,gain
+252148,NA,BJ104,19.1,recapture,gain
+252158,279105,BJ105,22.1,recapture,loss
+252118,279140,BC377,23.3,recapture,loss
+252134,NA,BJ085,21.5,recapture,loss
