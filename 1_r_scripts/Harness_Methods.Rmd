@@ -1,0 +1,144 @@
+---
+title: "Hummingbird Harness Methods"
+author: "Jessie Williamson"
+date: "10/20/2020"
+output: html_document
+---
+
+This is a super brief script meant to make Figure S1 for Williamson and Witt (In Review), "A customizable and lightweight body harness for hummingbirds" showing mass changes in Giant Hummingbirds tracked and recaptured using our harness design. 
+
+
+```{R, echo=FALSE}
+# I set some GLOBAL R chunk options here.
+#   (to hide this message add "echo=FALSE" to the code chunk options)
+
+knitr::opts_chunk$set(comment = NA, message = FALSE, warning = FALSE, width = 100)
+knitr::opts_chunk$set(fig.align = "center", fig.height = 4, fig.width = 6)
+
+#knitr::opts_chunk$set(cache = TRUE, autodep=TRUE)
+knitr::opts_chunk$set(cache = TRUE, autodep=TRUE)
+```
+
+
+# Load packages
+```{R}
+library(reshape)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(car)
+library(GGally)
+library(Hmisc)
+library(gridExtra)
+library(stats)
+library(gplots)
+library(ggplot2)
+library(stats4) # Forces knitr to work when it's being wonky
+library(PMCMR) #Allows Kruskal-Wallis post-hocs
+library(effects)
+library(gridExtra)
+library(lattice)
+library(survival)
+library(fmsb)
+library(faraway)
+library(ape)
+```
+
+
+---
+
+# Clear workspace and set WD
+```{R}
+rm(list=ls(all=TRUE)) # clear workspace 
+setwd("/Users/Jessie/Dropbox (MSBbirds)/Rdirectory/Hummingbird_Harness_Methods")
+```
+
+
+# load in data 
+```{R}
+# Read in Table 2 with brief recapture data for Giant Hummingbirds (part of Jessie Williamson's ongoing dissertation research)
+recaps <- read.csv("0_raw_data/Table2_harness_methods_recapture_data.csv", stringsAsFactors = TRUE) # n=7 geolocator individuals 
+recaps.reshape <- read.csv("0_raw_data/Table2_harness_methods_recapture_data_reshape.csv", stringsAsFactors = TRUE) # for plotting, below
+
+# Check data structure
+str(recaps)
+str(recaps.reshape)
+recaps.reshape$nk <- as.factor(recaps.reshape$nk)
+```
+
+This is a micro-dataset, but here's what columns mean: 
+NK: NK number (MSB)
+Other_NK: Second NK assigned at collecting event (not always applicable; some birds have the same NK)
+device_ID: Geolocator ID 
+neck_loop: Harness neck loop measurement in mm 
+deployment_mass: Mass taken at time of deployment (g)
+recapture_mass: Mass taken at recapture (g) 
+mass_diff: Difference in mass (recapture minus deployment; aka, final minus initial)
+gain_loss: Direction of mass between deployment or recapture; categorical variable with 2 levels: "gain" or "loss"
+
+Note: I quickly converted the "recaps" data frame into long format in Excel super quickly before beginning, but this can be done in R as well (and it's better practice to do it in R).
+
+
+# Wrangle data 
+```{r}
+# Rename one cumbersome column 
+names(recaps)[names(recaps) == "harness_neck_loop_measurement"] <- "neck_loop" # Make this column header simpler 
+
+# Make sure mass difference is calculated properly 
+recaps$mass_diff <- recaps$recapture_mass - recaps$deployment_mass
+
+# Reshape for making "interaction" plot below: 
+# library(tidyr)
+# recaps2 <- gather(recaps, "nk", "other_nk", 2:8)
+# Cheated and did this quickly in Excle as a time-saver 
+```
+
+**Mass summary:** 
+Loss range: -1.2 to -3.9 g loss 
+Gain range: 1.0-5.8 g gain 
+
+
+# Figure S1: Plot of mass change w/ NK identifier labels
+```{r}
+(p <- ggplot(recaps.reshape, aes(x=mass_type, y=mass, colour=gain_loss, linetype=gain_loss)) + 
+      geom_point(data=recaps.reshape, aes(y=mass), size=2.8) +
+      stat_smooth(data=recaps.reshape, aes(y=mass, group=nk), size=1.0, method="lm") +
+      coord_cartesian(xlim = c(1.45,2.4)) + # Increase first # to reduce space between y axis and Initial mass data 
+      scale_x_discrete(labels=c("Initial \n Mass (g)", "Recapure \n Mass (g)")) + 
+      annotate("text", 2.15, 19.05, label="NK252148", color = "black", size=3.5) + # NK252148 label
+      annotate("text", 2.15, 21.45, label="NK252134", color = "black", size=3.5) + # NK252134 label
+      annotate("text", 2.15, 22.05, label="NK252158", color = "black", size=3.5) + # NK252158 label
+      annotate("text", 2.15, 23.25, label="NK252118", color = "black", size=3.5) + # NK252118 label
+      annotate("text", 2.15, 23.95, label="NK252144", color = "black", size=3.5) + # NK252144 label
+      annotate("text", 2.15, 24.35, label="NK252152", color = "black", size=3.5) + # NK252152 label
+      annotate("text", 2.15, 24.65, label="NK252156", color = "black", size=3.5) + # NK252156 label
+      # scale_shape_manual(values=c("initial"=16, "recapture"=17)) + # Manually sets shape based on geography 
+      scale_color_manual(values=c(gain="darkgoldenrod2", loss="darkturquoise")) + 
+      labs(x = "", y = "Mass (g)") + # Remove big x-axis label; only want "Initial mass" and "recapture mass" 
+      theme_classic() +
+      theme(legend.position = "none") + # Note: orange = spring, blue = winter 
+      theme(axis.text.y=element_text(size=12), 
+            axis.text.x=element_text(size=12, color="black"), # X-axis label font size 
+            axis.title=element_text(size=14))
+)
+ggsave(p, filename="Figure3_HarnessMethods_Initial&RecapMassChangePlot.pdf", height=5, width=7, units="in")
+
+# Not quite sure how to crop right end of x-axis scale to plot area 
+# Quick workaround: Can manually crop .pdf output to desired file shape 
+```
+
+
+--------
+
+
+# Print environment for reproducibility
+```{r}
+sessionInfo()
+```
+
+
+# End 
+
+
+
+
