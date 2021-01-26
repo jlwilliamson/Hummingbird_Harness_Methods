@@ -1,11 +1,11 @@
 ---
 title: "Hummingbird Harness Methods"
 author: "Jessie Williamson"
-date: "10/20/2020"
+date: "Created 10/20/2020; last revised 1/25/21"
 output: html_document
 ---
 
-This is a super brief script meant to make Figure S1 for Williamson and Witt (In Review), "A customizable and lightweight body harness for hummingbirds" showing mass changes in Giant Hummingbirds tracked and recaptured using our harness design. 
+This is a super brief script meant to make Figure S1 for Williamson and Witt (In Review), "Alightweight body harness for tracking hummingbirds" showing mass changes in Giant Hummingbirds tracked and recaptured using our harness design. 
 
 
 ```{R, echo=FALSE}
@@ -125,6 +125,37 @@ ggsave(p, filename="Figure3_HarnessMethods_Initial&RecapMassChangePlot.pdf", hei
 
 # Not quite sure how to crop right end of x-axis scale to plot area 
 # Quick workaround: Can manually crop .pdf output to desired file shape 
+```
+
+
+# Use a t-test to see if deployment and recapture masses are significantly different
+We'll use a paired t-test to determine whether there is a statistical difference between the means of two dependent samples (vs unpaired, which asks if there's a difference between the means of two independent samples). Paired t-test assumes relationships between groups and it does NOT assume equal variance. 
+```{r}
+# Take a peek at means of groups; based on these, I don't anticipate significant differences 
+mean(recaps$deployment_mass)
+mean(recaps$recapture_mass)
+
+# Verify normal distributions (important because F test below is sensitive to non-normality)
+qqPlot(recaps$deployment_mass) # qqPlots look fantastic 
+qqPlot(recaps$recapture_mass)
+hist(recaps$deployment_mass) # A little hard to see dist patterns with small sample size...qqPlot more reliable in this case. 
+hist(recaps$recapture_mass)
+
+# Quickly test for equal variances: 
+var.test(recaps$deployment_mass, recaps$recapture_mass, alternative="two.sided")
+# Result: p-value for the F-test is >0.05, so there is no significant difference between the two variances. 
+
+# Two sample t-test, paired 
+t.summary <- t.test(recaps$deployment_mass, recaps$recapture_mass, 
+                    paired=TRUE, # specifies dependence between two groups (i.e. measurements of initial and final) 
+                    var.equal=TRUE, # verified w/ F-test above 
+                    conf.level=0.95)
+t.summary
+# t=-0.0782, df=6, p=0.9402; there are no significant differences in masses between deployment and recapture 
+# 95% CI: -3.229 to 3.02
+
+# Can alternatively just run t-test on the difference of the two
+# t.test(recaps$mass_diff)
 ```
 
 
