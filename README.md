@@ -1,6 +1,6 @@
 # Hummingbird Harness Methods
 
-Quick code associated with Williamson &amp; Witt, "A customizable and  lightweight backpack harness for hummingbirds", In Review. 
+Quick code associated with Williamson &amp; Witt, "A lightweight backpack harness for tracking hummingbirds", In Revision. 
 
 Folder `0_raw_data` contains all raw data associated with Giant Hummingbirds described in our paper. 
 
