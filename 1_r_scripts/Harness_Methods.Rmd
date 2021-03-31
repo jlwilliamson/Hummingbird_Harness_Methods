@@ -103,7 +103,9 @@ Gain range: 1.0-5.8 g gain
 (p <- ggplot(recaps.reshape, aes(x=mass_type, y=mass, colour=gain_loss, linetype=gain_loss)) + 
       geom_point(data=recaps.reshape, aes(y=mass), size=2.8) +
       stat_smooth(data=recaps.reshape, aes(y=mass, group=nk), size=1.0, method="lm") +
-      coord_cartesian(xlim = c(1.45,2.4)) + # Increase first # to reduce space between y axis and Initial mass data 
+      coord_cartesian(xlim = c(1.5,1.7)) + # Increase first # to reduce space between y axis and Initial mass data 
+    # I originally had this set to xlim=1.45, 2.4, but right-hand side had way too much weird x-axis space
+    # Setting these as is reduces blank space but increases the length of line segments connecting points, for some reason
       scale_x_discrete(labels=c("Initial \n Mass (g)", "Recapure \n Mass (g)")) + 
       annotate("text", 2.15, 19.05, label="NK252148", color = "black", size=3.5) + # NK252148 label
       annotate("text", 2.15, 21.45, label="NK252134", color = "black", size=3.5) + # NK252134 label
@@ -122,9 +124,6 @@ Gain range: 1.0-5.8 g gain
             axis.title=element_text(size=14))
 )
 ggsave(p, filename="Figure3_HarnessMethods_Initial&RecapMassChangePlot.pdf", height=5, width=7, units="in")
-
-# Not quite sure how to crop right end of x-axis scale to plot area 
-# Quick workaround: Can manually crop .pdf output to desired file shape 
 ```
 
 
