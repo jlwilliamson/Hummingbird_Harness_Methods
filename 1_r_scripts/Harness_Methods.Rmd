@@ -72,8 +72,11 @@ deployment_mass: Mass taken at time of deployment (g)
 recapture_mass: Mass taken at recapture (g) 
 mass_diff: Difference in mass (recapture minus deployment; aka, final minus initial)
 gain_loss: Direction of mass between deployment or recapture; categorical variable with 2 levels: "gain" or "loss"
+capture_time: Time of capture (24 hour format)
+capture_month: month of capture
+notes: notes pertaining to estimations of capture time (for some birds only)
 
-Note: I quickly converted the "recaps" data frame into long format in Excel super quickly before beginning, but this can be done in R as well (and it's better practice to do it in R).
+Note: I quickly converted the "recaps" data frame into long format in Excel super quickly before beginning, but this can be done in R as well (and it's better to do it in R).
 
 
 # Wrangle data 
