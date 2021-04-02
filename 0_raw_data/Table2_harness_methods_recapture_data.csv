@@ -1,8 +1,8 @@
-﻿nk,other_nk,device_ID,harness_neck_loop_measurement,deployment_mass,recapture_mass,mass_diff,gain_loss
-252152,279112,BJ091,34.44,23.2,24.2,1.0,gain
-252144,279172,BJ090,37.14,18.3,24.1,5.8,gain
-252156,279121,BJ112,37.26,23.1,24.2,1.1,gain
-252148,NA,BJ104,34.00,17.5,19.1,1.6,gain
-252158,279105,BJ105,35.38,25.8,22.1,-3.7,loss
-252118,279140,BC377,40.28,24.5,23.3,-1.2,loss
-252134,NA,BJ085,37.87,25.4,21.5,-3.9,loss
+﻿nk,other_nk,device_ID,harness_neck_loop_measurement,deployment_mass,recapture_mass,mass_diff,gain_loss,deployment_capture_time,recapture_capture_time,notes
+252152,279112,BJ091,34.44,23.2,24.2,1,gain,1640,NA,Recapture time not recorded
+252144,279172,BJ090,37.14,18.3,24.1,5.8,gain,2115,1900,Recapture time estimated from field notes
+252156,279121,BJ112,37.26,23.1,24.2,1.1,gain,740,1900,Recapture time estimated from field notes
+252148,NA,BJ104,34,17.5,19.1,1.6,gain,1230,925,
+252158,279105,BJ105,35.38,25.8,22.1,-3.7,loss,1046,745,
+252118,279140,BC377,40.28,24.5,23.3,-1.2,loss,1914,1100,Recapture time estimated from field notes
+252134,NA,BJ085,37.87,25.4,21.5,-3.9,loss,1042,935,

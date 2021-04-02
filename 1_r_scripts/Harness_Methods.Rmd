@@ -35,13 +35,10 @@ library(gplots)
 library(ggplot2)
 library(stats4) # Forces knitr to work when it's being wonky
 library(PMCMR) #Allows Kruskal-Wallis post-hocs
-library(effects)
-library(gridExtra)
-library(lattice)
-library(survival)
-library(fmsb)
-library(faraway)
-library(ape)
+library(viridis)
+library(lme4)
+library(sjstats)
+library(MuMIn)
 ```
 
 
@@ -173,6 +170,142 @@ w.summary
 # V = 14, p-value = 1; there are no significant differences in masses between deployment and recapture.
 ```
 
+
+# LMER 1: Is there an effect of time of day on body mass? 
+A linear mixed effects model will allow us to assess the effect of time of day on mass with a random effect of device_ID (i.e., individual), which accounts for repeated measures of individuals between deployment period (initial mass) and recapture period (recapture mass).
+```{r}
+# Removed 1 rows containing missing values (geom_point) --> Because no recapture mass from BJ091
+# Note that recapture times for BC377, BJ090, and BJ112 were esimtated from field notes (exact capture times not recorded)
+
+m1 <- lmer(mass ~ capture_time + (1|device_ID), data=recaps.reshape) 
+summary(m1)
+Anova(m1, type=3) 
+# round(AIC(m1), 3) # Only useful in model comparison, which we aren't doing
+
+# There is no effect of capture time on Giant Hummingbird mass. 
+
+
+# DIAGNOSTICS
+# Check assumptions w/ diagnostic plots (lm_diag_plots function doesn't work w/ S4 class)
+# See good diagnostics interpretation description on pg. 292 of Discovering Statistics in R
+
+# Residuals vs. fitted values 
+plot(m1) # looks good, to be expected with extremely small sample size 
+
+# Check distribution with normal curve overlaid
+hist((resid(m1) - mean(resid(m1))) / sd(resid(m1)), freq = FALSE); curve(dnorm, add = TRUE) # looks fine
+
+# Resid plots: No more than ~5% of cases should have abs values above 2; no more than ~1% should have abs values above 2.5
+# Any absolute value above 3 is an outlier 
+plot(resid(m1)) # not *ideal*, but also to be expected from small sample size... (we don't want to eliminate data!)
+
+
+# QQPLOT 
+qqnorm(resid(m1)) # Looks great; perhaps slight curvature at tails, but not very noticeable
+qqline(resid(m1))  
+
+# COOK'S D
+plot(cooks.distance(m1)) # One influential value >1; to be conservative, we'll try rerunning the model w/out this (below)
+# Any value above Cook's D of 1.0 is a highly influential value
+
+# LEVERAGE 
+plot(hatvalues(m1)) 
+
+
+# Variance explained by random effect of +(1|device_ID): 
+m1.indiv.var <- (2.134 / (2.134 + 5.777)); m1.indiv.var
+# 26.9% of variance in model explained by differences among individals 
+# This is: random effect variance / (random effect variance + residual variance)
+
+# Calculate R^2
+r2(m1) # sjstats method
+r.squaredGLMM(m1) # MuMIn pseudo R-squred method, both consistent
+# Marginal= variance explained by fixed effects
+# Conditional = variance explained by entire model including fixed and random effects
+
+# R^2 for full model is 0.27; R^2 for fixed effects (only time) = 0.002. 
+# This makes sense given that variance explained by individual is 0.269
+
+
+#####3
+
+# RERUN MODEL WITHOUT INFLUENTIAL OBSERVATION
+# Out of curiosity, let's try dropping the 1 cook's D value >1.0 (influential) to see if this affects model results
+cooks.distance(m1) # This is observation 2, easily visible on our plot (BJ090 w/ low mass very late in the day)
+sub <- recaps.reshape[-which(recaps.reshape$capture_time == 2115),] # very quick and dirty; just drop obs via time
+
+m2 <- lmer(mass ~ capture_time + (1|device_ID), data=sub) # rerun model w/out influential observation
+summary(m2) # Very small estimate
+Anova(m2, type=3) # Capture time still does not have a significant effect on mass 
+plot(cooks.distance(m2)) # Influential observation gone now 
+
+# Since removing this influential observation doesn't substantively change our results, and
+# Since we want to prioritize retaining all the observations we can, we'll report the results of the full model (m1)
+# in our manuscript w/ a supplemental plot (Figure S3) of the relationship between time of day and mass. 
+```
+
+
+# Figure S3: Plot relationship between time of day and mass
+Evidence suggests that birds may experience daily mass fluctuations (i.e., Polo & Bautista 2006). Are Giant Hummingbird masses affected by capture times? 
+```{r}
+(p1 <- ggplot(recaps.reshape, aes(x=capture_time, y=mass, colour=device_ID, shape=mass_type)) + 
+  geom_point(size=4.5, alpha=0.8) +
+  #scale_colour_viridis(discrete=TRUE) + # just use default R colors for visualization
+  #geom_smooth(method = "lm", formula = y ~ x, colour="black", size=1.0) + # line used to be dark turquoise 
+    # No relationship, so we don't want fit lines
+  theme_classic() + 
+  coord_cartesian(xlim = c(650,2200)) + # Forces y and x axes to take shape/limits you give them
+  scale_x_discrete(limits=c(0700,1000,1300,1600,1900,2200), labels=c(0700,1000,1300,1600,1900, 2200)) + 
+ # scale_y_discrete(limits=c(600,1,2,3,3.77), labels=c(0,10,100,1000,6000)) + # y-axis displayed in height in meters
+  labs(x="Capture Time (24 hour)", 
+       y="Mass (g)") +
+       # theme(axis.text.x = element_text(hjust = 1)) +
+  theme(legend.position = "right") + 
+  annotate("text", x=2050, y=25.7, label = "italic(R) ^ 2 == 0.27", parse = TRUE) + # Add R^2 value from lmer model
+  #ggtitle("A") + # Assign panel number/header; this will be (a) because first in series of 3
+  theme(plot.title.position = "plot", # parameter "plot" specifies that you want "title" flush with y-axis
+         plot.title = element_text(face="bold")) + # This makes panel header bold 
+       # This is good for labeling figure panels! Avoids having to manually toy w/ hjust and vjust
+  theme(plot.margin = unit(c(0.2,0.1,0.0,0.2), "cm")) +  # top, right, bottom, left
+  theme(axis.text.y=element_text(size=10), axis.text.x=element_text(size=10), axis.title=element_text(size=12))
+ )
+ggsave(p1, filename="FigureS3_Scatterplot_EffectOfCaptureTimeOnMass.pdf", height=5, width=7, units="in")
+
+```
+
+
+# LMER 2: Is there an effect of month on body mass?
+```{r}
+# Quick box plot of mean mass by month; remeber only n=1 for November
+p2 <- ggplot(recaps.reshape, aes(x = capture_month, y = mass))
+p2 <- p2 + geom_boxplot()
+p2 <- p2 + geom_point()
+p2 <- p2 + stat_summary(fun.y = mean, geom = "point", shape = 18, size = 4, alpha = 0.3)
+print(p2)
+# This is for general assessment only; we won't include this in the supplement because not useful for many reasons
+# i.e., doesn't account for individual variation, raw masses vs. masses split by capture/recapture, etc. 
+
+# monthdata <- recaps.reshape[-which(recaps.reshape$capture_month == "November"),] # Drop Nov because n=1
+
+m3 <- lmer(mass ~ capture_month + (1|device_ID), data=recaps.reshape) # rerun model w/out influential observation
+summary(m3) # Very small estimate
+Anova(m3, type=3) # Capture time still does not have a significant effect on mass 
+plot(cooks.distance(m3)) 
+r.squaredGLMM(m3) # Conditional R^2: 0.275; marginal R^2 = 0.223
+
+# Variance explained by random effect of +(1|device_ID): 
+m3.indiv.var <- (0.4197 / (0.4197 + 5.8751)); m3.indiv.var
+# 6.7 of variance in model explained by differences among individals 
+# This is: random effect variance / (random effect variance + residual variance)
+
+library(lsmeans)
+# lsmeans for capture_month; but don't report in text because not sig.  
+lsmeans(m3, list(pairwise ~ capture_month           ), adjust = "tukey")
+# This confirms what we know from the box plot: Dec masses are lower than January and February
+# Feb masses are higher than Jan masses 
+# Comparisons aren't significant. Don't interpret Nov because n=1. 
+
+```
 
 --------
 
