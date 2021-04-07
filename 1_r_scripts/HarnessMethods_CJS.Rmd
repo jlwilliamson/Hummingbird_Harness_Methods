@@ -1,0 +1,566 @@
+---
+title: "Cormack-Jolly-Seber Mark-Recapture Models"
+author: "Jessie Williamson"
+date: "4/3/2021"
+output: html_document
+---
+
+Use Cormack-Jolly-Seber (CJS) models to estimate apparent survival and recapture probabilities from our geolocator birds *and* from our two satellite birds.  
+
+
+Cormack-Jolly-Seber models are mark-recapture models used to estimate two parameters:
+
+1) Detection probability (pt, the probability of encountering a live animal at time t)
+2) Apparent survival (Φt, the probability of an animal surviving and remaining in the study area between time t and t + 1).
+Note that “Apparent” survival confounds surviving and remaining in the study area. In this script, I use “survival” when describing apparent survival for simplicity.
+
+```{R, echo=FALSE}
+# I set some GLOBAL R chunk options here.
+#   (to hide this message add "echo=FALSE" to the code chunk options)
+
+knitr::opts_chunk$set(comment = NA, message = FALSE, warning = FALSE, width = 100)
+knitr::opts_chunk$set(fig.align = "center", fig.height = 4, fig.width = 6)
+
+#knitr::opts_chunk$set(cache = TRUE, autodep=TRUE)
+knitr::opts_chunk$set(cache = TRUE, autodep=TRUE)
+```
+
+
+# Load packages
+```{R}
+library(reshape)
+library(reshape2)
+library(plyr)
+library(dplyr)
+library(car)
+library(GGally)
+library(Hmisc)
+library(gridExtra)
+library(stats)
+library(gplots)
+library(ggplot2)
+library(stats4) # Forces knitr to work when it's being wonky
+library(PMCMR) #Allows Kruskal-Wallis post-hocs
+library(viridis)
+library(lme4)
+library(sjstats)
+library(MuMIn)
+
+library(marked) # for Cormack-Jolly-Seber models
+# Make sure you don't have RMark simultaneously loaded because 'marked' and 'RMark' have many functions w/ the same names
+library(R2ucare) # For Goodness of fit tests
+library(unmarked)
+library(magrittr) # for pipes
+```
+
+
+---
+
+# Clear workspace and set WD
+```{R}
+rm(list=ls(all=TRUE)) # clear workspace 
+setwd("/Users/Jessie/Dropbox (MSBbirds)/Rdirectory/Hummingbird_Harness_Methods")
+```
+
+
+# load in data 
+```{R}
+cjs <- read.csv("Patagona_Cormack-Jolly-Seber_04-06-21.csv", stringsAsFactors = TRUE) # capture history data 
+str(cjs) # Check data structures
+# 'ch' capture histories must be characters! (And they're currently integers...)
+
+# Alternative way to read in the data and deal w/ leading zeros
+# test <- read.csv("capture_history.csv", stringsAsFactors = TRUE) 
+# test <- test[ , !(colnames(test) %in% c("X"))] # drop weird X column 1 if reading in from read.csv
+# test$ch <- sprintf("%03d", test$ch) # Another way to fix leading zeros if reading in from .csv (since R removes leading 0s)
+# str(test)
+```
+
+
+# Wrangle & Subset data 
+We want 'ch' capture histories (MAKE SURE THESE ARE CHARACTER STRINGS WITH LEADING ZEROS!) and tagging_age as a blocking variable. Can't use sex because can't ID Patagona to sex without gonads. 
+```{r}
+# Get the data into the format you need
+capture.seasons <- c("Year1_Jan2017", "Year2_Nov2017.Jan2018", "Year3_Dec2018.Jan2019") # Define capture seasons
+cjs$ch <- do.call(paste, c(cjs[capture.seasons], sep = ""))  # Apply do.call & create string capture histories 
+# This makes a binary variable called 'ch' with 010 capture histories 
+# Where each 0 represents lack of detection/capture
+# And each 1 represents detection/capture 
+# One row per individual; all capture histories must be of the same length
+# cjs$ch <- sprintf("%03d", cjs$ch) # Another way to fix leading zeros if reading in from .csv (since R removes leading 0s)
+
+# Drop data for satellite birds because a history of "001" provides no information to the CJS model because 
+# capture/non-capture status is only informative when conditioned on earlier captures 
+cjs <- cjs[-which(cjs$tracking_device_type == "satellite_transmitter"),] 
+
+# These don't solve my problem! More on this "111" and "101" convergence/math issue below.
+# Update 101 to 111
+#cjs[cjs$trackingID=="BC377" & cjs$ch=="101",][, "ch"] <- 111
+
+# Test to see if removing 101 helps: 
+# test <- cjs[-which(cjs$ch == "101"),]
+```
+
+
+# Subset data to capture history format you'll want for models
+```{r}
+# Create the data subset w/ just capture histories and tagging_age as a blocking variable
+cjsdat <- subset(cjs, select = c(ch, # Capture history
+                                 tagging_age
+                                        ) )
+
+str(cjsdat) # Good; ch format is character 
+cjsdat <- na.omit(cjsdat) # shouldn't be NAs, but things are being a little weird so this is a precaution
+
+write.csv(cjsdat, "/Users/Jessie/Dropbox (MSBbirds)/Rdirectory/Hummingbird_Harness_Methods/CaptureHistory_CJS.csv")
+```
+
+
+# Creating a basic CJS model
+There are two components of the model (one for detection probability, one for survial probability). Each sub-model is a linear model (on a logit scale to bound probabilities between 0 and 1). We’ll start with the default model of constant detection probability and constant survival probability.
+
+Use the crm() function, which calls three functions in term: 
+1) `process.data` to process the data;
+2) `make.design.data` to create the list of parameter-specific dataframes;
+3) `cjs`, to fit the CJS model with the defined formulas.
+```{r}
+# Create a basic CJS model (constant survival and detection) with: 
+cjs.basic <- crm(cjsdat, hessian=TRUE) # 47 capture histories collapsed into 8
+
+# With this basic model I get a persistent error message: 
+# Error in apply(ind, 1, function(x, z) rep(z[x[1]], x[3] - x[2] + 1), z = imat$freq) : 
+#   dim(X) must have a positive length
+```
+
+
+*THE REASON FOR THIS ERROR* (this took a lot of digging to arrive at): 
+Ultimately, small sample size and lack of detection of birds in Year2 that were tagged in Year1 (i.e., anything with a "11" in the first two characters) means that the behind-the-scenes math doesn't work. 
+
+This is because without a level of "111", I can't calculate Phi1 to estimate survival from year 1 to year 2 (I can't get this estimate with the single level of "101" that I have from BC377). Essentially, the estimate for p2 = 0, and because I also have no "110"s, the estimate for Phi1p2 = 0. That means that when I go to calculate Phi1 (which is Phi1p2/p2, I get 0/0 = Error!).
+
+- The easiest solution is to change our "101" from BC377 to "111", which would affect capture probability estimates but not survival. This also makes more sense and seems to be the most minor modification possible given that this bird *did* survive for two years. HOWEVER, When I make this change, the model still doesn't run. I can hand-calculate Phi1, Phi1p2, and p2, but I cannot get the model to run in R with this structure (more on these hand estimates below). I assume what's happening is that R knows something - a value - should be there to divide by, but instead it's coming up with a null/empty and can't compute. 
+- Having multiple "101"s wouldn't help because p2 would still be zero. 
+- And, having multiple "110"s wouldn't help, because I would get a value for Phi1p2, but I'd still be dividing by a denominator p2 of zero, which results in an error. 
+
+SOLUTION: The best, and so far only workable, solution is to add in one dummy level of "111" in order that the matrix math behind the scenes works. But, adding one level of "111" will inflate survival and capture probability estimates slightly (I have also tried adjusting proportions of "111"s added in order to match the hand calculated survival and capture probabilities, and it just doesn't work). 
+
+Next step: 
+
+
+# By *how much* does adding in a single "111" level inflate annual survival and capture probability estimates? --> 
+# Manually calculate p2, Phi1p2, and Phi1 for year 2
+```{r}
+# my data: 101 = 1; 111 = 0; 110 = 0
+# My data w/ dummy "111" 101 = 1; 111 = 1; 110 - 0
+# Adjust these numers to come up with estimates 
+one_zero_one <- 1
+one_one_one <- 1 # Change this number to look at the effect of adding in a dummy level of "111"
+sum1 <- one_zero_one + one_one_one
+one_one_zero <- 0
+geos2017 <- sum(cjs$ch=="100") + sum(one_zero_one) + sum(one_one_one); geos2017 # true # deployed + # of dummy 111s to add
+# Should be 16 geos deployed in 2017 and 17 if considering dummy 
+
+p2 <- one_one_one/sum1; p2 # probability of capture in year 2
+Phi1p2 <- one_one_one/geos2017; Phi1p2 # probability that animal survives from year1 to year 2 and is detected in year 2
+Phi1 <- Phi1p2/p2; Phi1 # estimated survival for year 1
+
+# Test 1: 
+# Confirmed: with my data the way they are (101 = 1; 111 - 0), it is impossible to calculate survivorship 
+# for year 1 (Phi1)!! (This results in "NaN")
+
+# Test 2: 
+# IF I change "101" into "111" then Phi1 = 0.0625; this checks out with my hand-calculations
+
+# Test 3: 
+# When I add in "111" of 1, survivorship for year 1 becomes 0.117
+# And capture probability is inflated
+
+# How is survival estimate (Phi1) affected? 
+Phi1_real <- 0.0625 # This is true estimate calculated by changing the BC377 101 into 111
+Phi1_dummy <- 0.1176471
+Phi1_diff <- Phi1 - Phi1_real; Phi1_diff
+# Adding in that single "111 individual" inflates Phi1 survival estimate by ~5.5%
+
+# How is probability of capture estimate (p2) affected? 
+p2_real <- 0 # This is true estimate calculated by changing the BC377 101 into 111
+p2_dummy <- 0.5 # Alternatively, use: one_one_one/sum(one_one_one + one_zero_one)
+p2_diff <- p2_dummy - p2_real; p2_diff
+# Adding in that single "111" individual inflates p2 capture estimate by 50%
+```
+
+So: Adding in a single "dummy" level of "111" in order to make the model converge and make the matrix math work increases year 1 survival estimate (Phi1) by 0.055 (5.5%) and capture probability by 0.5 (50%). This does NOT mean that this is the proportion by which annual estimates of survival and capture probability increase, however. 
+
+It is not ideal, but given that I really have no other option, it may be the only solution. 
+
+
+# Update CJS data with dummy "111" level 
+```{r}
+# Must have this "111" level in order to estimate year 1 survival and capture probabilities
+cjsdat_adjusted <- rbind(cjsdat, data.frame(ch = c(rep("111", 1)), tagging_age = rep("adult", 1)))
+
+# If incorporating multiple levels (unneccessary and we don't want this!)
+# cjsdat_adjusted <- rbind(cjsdat,
+#                                 data.frame(ch = c(rep("001", 1),
+#                                                   rep("111", 1)),
+#                                                   tagging_age = rep("adult", 1)))
+
+write.csv(cjsdat_adjusted, "/Users/Jessie/Dropbox (MSBbirds)/Rdirectory/Hummingbird_Harness_Methods/CaptureHistory_CJS_adj.csv")
+```
+
+
+# Now fit the CJS model with updated data 
+- We'll assume equal time intervals (time.interval argument) because all recapture attempts occurred during roughly the 
+same window of the breeding season. 
+But, if we do want to play with time, capture interval is 1/12 months = ~0.08/month (so ~0.17 for 2 month interval and 0.83 for 10 months; see Blake and Loiselle 2008)
+- We will not consider a time-since capture (TSM) model because we have a relatively short study period (3 years), overall low sample size, and very low recapture rate. Additionally, this would only matter for one individual (BC377) because all others were recaptured in the year following initial deployment.
+```{r}
+# Create a basic CJS model (constant survival and detection) with:
+cjs.m1 <- crm(cjsdat_adjusted, hessian=TRUE) # 48 capture histories collapsed into 9; hessian=TRUE gets precision estimates
+cjs.m1
+# A non-zero value for convergence means the model did NOT converge (aka, you want convergence = 0)
+
+# Warning message:
+# In optimx.check(par, optcfg$ufn, optcfg$ugr, optcfg$uhess, lower,  :
+#   Parameters or bounds appear to have different scalings.
+#   This can cause poor performance in optimization. 
+#   It is important for derivative free methods like BOBYQA, UOBYQA, NEWUOA.
+
+# TAKE A LOOK AT MODEL OUTPUT AND ESTIMATES
+# Estimates are on a logit scale, so let’s change them back to real estimates using the inverse logit. 
+# You can calculate: 1) by hand; 2) w/ plogis(); 3) w/ predict(). All should give the same estimates.
+# exp(cjs.m1$results$beta$Phi)/(1+exp(cjs.m1$results$beta$Phi)) # real Phi (survival) estimate by hand; change to p for p
+# plogis(cjs.m1$results$beta$Phi) # Phi (suvrival) estimate with plogis; change to beta$p for p
+
+predict(cjs.m1)
+# $Phi= Probability of a Patagona surviving between capture events was 0.48
+# $p = Probability of catching a Patagona during a capture event was 0.34
+```
+
+Note about this warning: Some googling retrieved a BioGeoBEARS page w/ descriptions of warnings that can and can't be ignored. Based on this page, it seems like I CAN ignore this warning message the model is throwing at me. 
+
+Rationale from the site: ML searches seem to reach the same results whether or not this warning is thrown, as long as the ML parameter values actually are within the user-specified bounds.
+
+More info here: http://phylo.wikidot.com/biogeobears-warnings-to-ignore-mostly
+
+And, proceed. 
+
+
+# Fit and compare a set of CJS models 
+We'll use James Paterson's function for generating subsets of models to fit and then compare models w/ a nice table output.
+**See CUT script from code of James' I modified for individually specifying models to run.
+```{r}
+# It is good practice to follow these steps:
+# 1. Process data
+# 2. Create design data
+# 3. Set-up and execute entire candidate model set
+# The advantage is it is easier to add covariates (e.g. time-varying effects from weather or experiments)
+
+# Process data (and set grouping variables)
+cjs.proc <- process.data(cjsdat_adjusted, 
+                         group = "tagging_age") # group variable has to be in the data
+
+# Make design data (from processed data)
+cjs.ddl <- make.design.data(cjs.proc)
+
+# Function to fit multiple CJS models  
+fit.cjs.models <- function(){
+    
+  # Apparent survival (Phi) formula
+    Phi.dot <- list(formula = ~1) # constant survival
+    Phi.age <- list(formula = ~tagging_age) # differs between adult and juv
+
+    # Detection probability (p) formula
+    p.dot <- list(formula = ~1) # constant detection
+    p.age <- list(formula = ~tagging_age)  # differs between adult and juv
+
+    # Construct all combinations and put into one model table
+    cml <- create.model.list(c("Phi", "p")) # makes all possible combinations of those parameter formulas
+    results <- crm.wrapper(cml, # crm.wrapper makes model sel table; stores results; in list stores model file names 
+                           data = cjs.proc, 
+                           ddl = cjs.ddl,
+                           external = FALSE, 
+                           accumulate = FALSE, 
+                           hessian = TRUE)
+    return(results)
+}
+
+# Run function
+cjs.models <- fit.cjs.models()
+cjs.models
+
+# Pull models w/ list format (order given in order of # rows in table output):
+# Listed from "best" to "worst": 
+cjs.models[[4]] # Simplest model, Phi(.)p(.)
+cjs.models[[2]] # Phi(~age)p(.)
+cjs.models[[3]] # Phi(.)p(~age)
+cjs.models[[1]] # Phi(~age)p(age)
+
+predict(cjs.models[[1]]) # Predict from models in the set by calling brackets
+
+# Top model is cjs.m1, so let's get our final estimates: 
+cjs.top <- cjs.models[[4]]
+predict(cjs.top)
+
+cjs.global <- cjs.models[[1]] # Our most complex model, Phi(age)p(age)
+```
+
+What this model list tells us: 
+- The top model is the simplest model that assumes constant survival and detection probability. 
+- $Phi= Probability of a Patagona surviving between capture events was 0.48
+- $p = Probability of catching a Patagona during a capture event was 0.34
+
+
+# # EVALUATE GOODNESS OF FIT (GOF) AND OVERDISPERSION
+
+# Set up data structures for GOF tests
+```{r}
+
+# Begin by recreating capture histories (aka, 0/1 histories spread across all 3 years of our sampling: 
+# Full data
+cjsdat.ch.gof <- cjsdat_adjusted$ch %>%
+  strsplit('') %>%
+  sapply(`[`) %>%
+  t() %>%
+  unlist() %>%
+  as.numeric %>%
+  matrix(nrow = nrow(cjsdat_adjusted))
+
+# Adults only
+cjsdat.adult.ch.gof <- cjsdat_adjusted$ch[cjsdat_adjusted$tagging_age == "adult"] %>%
+  strsplit('') %>%
+  sapply(`[`) %>%
+  t() %>%
+  unlist() %>%
+  as.numeric %>%
+  matrix(nrow = nrow(cjsdat_adjusted[cjsdat_adjusted$tagging_age == "adult",]))
+
+# Juveniles only
+cjsdat.juv.ch.gof <- cjsdat_adjusted$ch[cjsdat_adjusted$tagging_age == "juvenile"] %>%
+  strsplit('') %>%
+  sapply(`[`) %>%
+  t() %>%
+  unlist() %>%
+  as.numeric %>%
+  matrix(nrow = nrow(cjsdat_adjusted[cjsdat_adjusted$tagging_age == "juvenile",]))
+```
+
+
+
+**GOF TESTS in R2ucare (yes, they all have horrible names and poor documentation)**: 
+- Test 1 = the omnibus or overall test ("overall_CJS"). It asks: Overall, is there evidence that animals have equal capture probabilities and equal survival? Tells us if there’s a problem, but not where (which events) or why (which assumption is violated).
+- Test 2 = Does recapture depend on when an animal was first marked? Tests the equal catchability assumption.
+- Test 3 = Does marking affect survival? Tests the equal survival assumption.
+Generally, try Test 1, and if there is evidence of lack-of-fit, use Test 2 and Test 3 to determine which assumptions are violated. Note: These tests are always for time-dependent models, i.e. “Phi.time.p.time”.
+
+Let’s start with Test 1. 
+
+# GOF test 1: 'overall_CJS'
+Try on full data, then just adults, then just on juvs
+```{r}
+# 1st argument = capture history matrix (made above)
+# 2nd argument = capture history frequency (vector of 1's for our example)
+# FYI, this test is the gum of 4 component tests with the worst names in history: Test3.SR, Test3.SM, Test2.CT and Test2.CL
+
+overall_CJS(cjsdat.ch.gof, rep(1,nrow(cjsdat_adjusted))) # All data 
+overall_CJS(cjsdat.adult.ch.gof, rep(1,nrow(cjsdat_adjusted[cjsdat_adjusted$tagging_age == "adult",]))) # Adults only
+overall_CJS(cjsdat.juv.ch.gof, rep(1,nrow(cjsdat_adjusted[cjsdat_adjusted$tagging_age == "juvenile",]))) # Juvs only
+# When I run all of these I get the following message: Error in m[rw, cl] : subscript out of bounds
+
+# As a workaround, see if it helps to manually create frequency matrices and call those for second argument??
+# make freq vectors: 
+cjsdat.freq <- rep(1,nrow(cjsdat_adjusted))
+cjsdat.adult.freq <- rep(1,nrow(cjsdat_adjusted[cjsdat_adjusted$tagging_age == "adult",]))
+cjsdat.juv.freq <- rep(1,nrow(cjsdat_adjusted[cjsdat_adjusted$tagging_age == "juvenile",]))
+
+overall_CJS(cjsdat.ch.gof, cjsdat.freq)
+overall_CJS(cjsdat.adult.ch.gof, cjsdat.adult.freq) # Adult overall
+overall_CJS(cjsdat.juv.ch.gof, cjsdat.juv.freq) # juv overall
+
+# Same error :( 
+```
+
+From somewhere online: In other words: If you are receiving the error message “subscript out of bounds” you should check whether you are trying to use a data element that does not exist in your data.
+
+
+------
+
+****JESSIE STOPPED HERE ON 4/6/21. THE rest below is from the James Paterson tutorial. It's hard for me to revise/update it based on my own results until I have some clarity about how to proceed with the R2ucare package. 
+
+
+
+
+
+
+
+
+We can see that using the χ2 value and an alpha level of 0.05, we fail to reject the null hypothesis. Thus, there is no strong evidence for lack-of-fit, but we can’t really see what we’re testing. Test 1 is actually a combination of Test 2 and Test 3.
+
+Next, let’s perform Tests 2, and 3 on the subset of data for females to better understand the components and how they’re related.
+
+Test 2 asks the question: does recapture depend on when an animal was first marked? There are two components: Test2.CT and Test2.CL.
+
+# 1) Test 2.CT: Tests whether there is a difference in *p* (capture probability) at t+1 between those captured and not captured at t when animals are known to be alive because they are recaptured later in the study.
+```{R}
+# first argument = capture history matrix, second argument is frequency of each capture history (1 for example)
+
+test2ct_adult <- test2ct(cjsdat.adult.ch.gof, rep(1,nrow(cjsdat_adjusted[cjsdat_adjusted$tagging_age == "adult",]))) 
+test2ct_adult
+
+# try w/ all data 
+test2ct_all <- test2ct(cjsdat.ch.gof, rep(1,nrow(cjsdat_adjusted))) 
+test2ct_all
+
+# try w/ no single levels 
+test2ct_test <- test2ct(test.all, rep(1,nrow(test))) 
+test2ct_test
+```
+
+Notice that there were not enough individuals for some components, which is often the case, depending on the capture histories in your data set.
+
+
+# 2) Test2.CL: This tests whether there is a difference in the expected time of next recapture between individuals captured and not captured at t when animals are known to be alive.
+```{R}
+
+test2cl_adult <- test2cl(cjsdat.adult.ch.gof, rep(1,nrow(cjsdat_adjusted[cjsdat_adjusted$tagging_age == "adult",])))
+test2cl_adult
+
+# try w/ all data 
+test2cl_all <- test2cl(cjsdat.ch.gof, rep(1,nrow(cjsdat_adjusted))) # Error in rep(NA, km4) : invalid 'times' argument
+test2cl_all
+
+# try w/ no single levels 
+test2cl_test <- test2cl(test.all, rep(1,nrow(test))) 
+test2cl_test
+
+```
+
+Uhoh! No tests were performed for test2cl (test_perf = “none” for all components) because of low sample sizes. These tests use contingency tables, so higher cell counts (more captures and recaptures) will increase your ability to perform the tests.
+
+Next, we perform Test 3, which tests whether marking affects survival (equal survival assumption). There are two components to Test 3 (Test3.SR and Test3.SM).
+
+
+# 3) Test3.SR: Does marking affect survival? Do individuals with previous marks have different survival rates than first-time captures?
+```{r}
+test3sr_adult <- test3sr(cjsdat.adult.ch.gof, rep(1,nrow(cjsdat_adjusted[cjsdat_adjusted$tagging_age == "adult",])))
+test3sr_adult
+
+# Finally, a test that runs! 
+
+# try w/ all data 
+test3sr_all <- test3sr(cjsdat.ch.gof, rep(1,nrow(cjsdat_adjusted))) 
+test3sr_all
+
+# try w/ no single levels 
+test3sr_test <- test3sr(test.all, rep(1,nrow(test))) # worse than w/ the actual data
+test3sr_test
+```
+
+Conclusion of `Test3.SR`: There is no evidence that individuals with previous marks have different survival rates than individuals caught for the first time.
+
+
+# 4) Test3.SM: For animals seen again, does when they are recaptured depend on whether they were marked on or before time t?
+```{r}
+test3sm_adult <- test3sm(cjsdat.adult.ch.gof, rep(1,nrow(cjsdat_adjusted[cjsdat_adjusted$tagging_age == "adult",])))
+test3sm_adult
+
+# Sad :( 
+# test_perf = none means that no tests were performed for test2cl because of low sample sizes
+# These tests use contingency tables, so higher cell counts (more captures and recaptures will increase ability to perform
+# tests)
+
+
+# try w/ all data 
+test3sm_all <- test3sm(cjsdat.ch.gof, rep(1,nrow(cjsdat_adjusted))) 
+test3sm_all
+
+# try w/ no single levels 
+test3sm_test <- test3sm(test.all, rep(1,nrow(test))) 
+test3sm_test
+```
+
+Conclusion of `Test3.SM`: No tests performed due to small sample sizes. 
+
+
+----
+
+# Releases for "unmarked bird" capture and survival rate estimates = DON'T USE!!!
+```{r}
+# releases <- read.csv("Patagona_releases.csv", stringsAsFactors = TRUE)
+# releases$ch <- do.call(paste, c(releases[capture.seasons], sep = ""))  # Apply do.call & create string capture histories 
+# 
+# reldat <- subset(releases, select = c(ch # Subset by apture history
+#                                         ) )
+# 
+# # Possible data combinations: 001, 010, 100, 011, 110, 111, 101
+# # BUT, my release data only give me 001, 010, 100
+# # So, need to add in dummy data for missing levels to be able to get models to converge
+# reldat_padded <- rbind(reldat,
+#                                 data.frame(ch = c(rep("011", 1),
+#                                                   rep("111", 1),
+#                                              #     rep("110", 1), # Model runs w/out this and I want to reduce dummy data
+#                                                   rep("101", 1))
+#                                            ))
+# rel.test.cjs <- crm(reldat_padded) # 6 capture histories collapsed into 5
+# rel.test.cjs
+# 
+# # I still get the optimizer warning message: 
+# # Warning message:
+# # In optimx.check(par, optcfg$ufn, optcfg$ugr, optcfg$uhess, lower,  :
+# #   Parameters or bounds appear to have different scalings.
+# #   This can cause poor performance in optimization. 
+# #   It is important for derivative free methods like BOBYQA, UOBYQA, NEWUOA.
+#   
+# # Get model estimates
+# predict(rel.test.cjs)
+# # Probability of survival for unmarked Patagona = 0.87
+# # Probability of capturing a Patagona during a capture event was 0.49
+```
+
+These estimates are problematic for many reasons: 
+- Release birds were unmarked (other than a rectrix clip for intra-seasonal IDs), so *could* therefore be considered controls; however, unmarked also means that there was essentially no way we could have identified them from year to year. This means there's a high likelihood that it was NEVER possible to have two ones next to each other (e.g. "011", because we could never re-ID the same released bird)
+- Even if these were perfect data, 8 is very small. 
+- And, we're missing so many levels and have to add ~50% of capture history types, which amounts to adding ~30% of dummy data in order to even be able to fit models. We just don't have enough to produce reliable estimates. 
+- Model convergence/warning issues are not ideal. 
+- Model estimates seem off - Probability of survival of 0.87 seems extremely high for any wild animal; likewise, probability of capture of 0.49 *might* make sense if the tagged bird estimate wasn't so much lower (again, given that the release bird dataset has only 8 observations + 3 dummy variables, it doesn't make intuitive sense to me that overall capture probabilities would be 0.20 higher for unmarked birds than marked birds).
+- SO, for all of these reasons, I do not think these estimates are reliable, and I don't think this is something we want to include in our paper. 
+
+
+--------
+
+Tutorials on Cormack-Jolly-Seber models: 
+
+James Paterson GitHub Repo: https://github.com/jamesepaterson/markrecaptureworkshop
+James Paterson Creating Capture Histories in R: https://jamesepaterson.github.io/jamespatersonblog/07_creatingcapturehistories
+James Paterson CJS models in R: https://jamesepaterson.github.io/jamespatersonblog/2020-04-26_introduction_to_CJS.html
+
+Theory and Background on CJS models: https://www.montana.edu/rotella/documents/502/CJS.pdf
+
+Clark Rushing Applied Bayesian Analysis for Ecological Data course: https://rushinglab.github.io/WILD6900/index.html
+Clark Rushing Basic CJS models w/ dipper data: https://rushinglab.github.io/WILD6900/articles/cjs.html
+
+'marked' package vignette: https://cran.r-project.org/web/packages/marked/vignettes/markedVignette.html
+
+Troubleshooting and solving error 'dim(x) must have positive length' (*but it didn't help me*): https://statisticsglobe.com/r-error-in-apply-dim-must-have-positive-length
+
+CJS tutorial from Montana: https://www.montana.edu/rotella/documents/502/CJS-intro.html#multinomial_distribution
+
+Describes structure for time-dependent models: http://rstudio-pubs-static.s3.amazonaws.com/11453_e5657d3e0ee745afa5c797180d4fe829.html
+
+A breakdown of distinct capture history profiles and contributions to likelihood: https://mc-stan.org/docs/2_26/stan-users-guide/mark-recapture-models.html
+
+Another 'marked' tutorial: http://rstudio-pubs-static.s3.amazonaws.com/11453_e5657d3e0ee745afa5c797180d4fe829.html
+
+phi.dot.org - advice for adding time-since-marking data: http://www.phidot.org/forum/viewtopic.php?f=21&t=2591
+
+Laake et al. 2013 - Marked package vignette: https://cran.r-project.org/web/packages/marked/vignettes/markedVignette.html
+
+--------
+
+
+# Print environment for reproducibility
+```{r}
+sessionInfo()
+```
+
+
+# End 
