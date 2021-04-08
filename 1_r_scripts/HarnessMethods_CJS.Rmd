@@ -87,7 +87,6 @@ cjs$ch <- do.call(paste, c(cjs[capture.seasons], sep = ""))  # Apply do.call & c
 # Where each 0 represents lack of detection/capture
 # And each 1 represents detection/capture 
 # One row per individual; all capture histories must be of the same length
-# cjs$ch <- sprintf("%03d", cjs$ch) # Another way to fix leading zeros if reading in from .csv (since R removes leading 0s)
 
 # Drop data for satellite birds because a history of "001" provides no information to the CJS model because 
 # capture/non-capture status is only informative when conditioned on earlier captures 
@@ -145,7 +144,6 @@ This is because without a level of "111", I can't calculate Phi1 to estimate sur
 SOLUTION: The best, and so far only workable, solution is to add in one dummy level of "111" in order that the matrix math behind the scenes works. But, adding one level of "111" will inflate survival and capture probability estimates slightly (I have also tried adjusting proportions of "111"s added in order to match the hand calculated survival and capture probabilities, and it just doesn't work). 
 
 Next step: 
-
 
 # By *how much* does adding in a single "111" level inflate annual survival and capture probability estimates? --> 
 # Manually calculate p2, Phi1p2, and Phi1 for year 2
@@ -295,7 +293,7 @@ cjs.models[[2]] # Phi(~age)p(.)
 cjs.models[[3]] # Phi(.)p(~age)
 cjs.models[[1]] # Phi(~age)p(age)
 
-predict(cjs.models[[1]]) # Predict from models in the set by calling brackets
+predict(cjs.models[[4]]) # Predict from models in the set by calling brackets
 
 # Top model is cjs.m1, so let's get our final estimates: 
 cjs.top <- cjs.models[[4]]
@@ -376,90 +374,93 @@ overall_CJS(cjsdat.ch.gof, cjsdat.freq)
 overall_CJS(cjsdat.adult.ch.gof, cjsdat.adult.freq) # Adult overall
 overall_CJS(cjsdat.juv.ch.gof, cjsdat.juv.freq) # juv overall
 
-# Same error :( 
+# CANNOT RUN TEST
+# Error in m[rw, cl] : subscript out of bounds
 ```
 
 From somewhere online: In other words: If you are receiving the error message “subscript out of bounds” you should check whether you are trying to use a data element that does not exist in your data.
 
-
-------
-
-****JESSIE STOPPED HERE ON 4/6/21. THE rest below is from the James Paterson tutorial. It's hard for me to revise/update it based on my own results until I have some clarity about how to proceed with the R2ucare package. 
+I spoke with Olivier Gimenez, creator of the R2ucare package, on 4/6/21, and he said that I'm likely running into problems due to small sample sizes. James Paterson agreed, and mentioned that because frequency test comparisons are made between cohorts, and because many of my cohorts are empty, I'm also likely seeing problems for this reason. 
 
 
 
+Let's try performing individual tests for the full dataset and data susets to better understand the components and how they’re related.
 
-
-
-
-
-We can see that using the χ2 value and an alpha level of 0.05, we fail to reject the null hypothesis. Thus, there is no strong evidence for lack-of-fit, but we can’t really see what we’re testing. Test 1 is actually a combination of Test 2 and Test 3.
-
-Next, let’s perform Tests 2, and 3 on the subset of data for females to better understand the components and how they’re related.
-
-Test 2 asks the question: does recapture depend on when an animal was first marked? There are two components: Test2.CT and Test2.CL.
+**Test 2** asks the question: Does recapture depend on when an animal was first marked? There are two components: Test2.CT and Test2.CL.
 
 # 1) Test 2.CT: Tests whether there is a difference in *p* (capture probability) at t+1 between those captured and not captured at t when animals are known to be alive because they are recaptured later in the study.
 ```{R}
 # first argument = capture history matrix, second argument is frequency of each capture history (1 for example)
 
-test2ct_adult <- test2ct(cjsdat.adult.ch.gof, rep(1,nrow(cjsdat_adjusted[cjsdat_adjusted$tagging_age == "adult",]))) 
-test2ct_adult
-
 # try w/ all data 
 test2ct_all <- test2ct(cjsdat.ch.gof, rep(1,nrow(cjsdat_adjusted))) 
 test2ct_all
 
-# try w/ no single levels 
-test2ct_test <- test2ct(test.all, rep(1,nrow(test))) 
-test2ct_test
+# Try w/ adult data 
+test2ct_adult <- test2ct(cjsdat.adult.ch.gof, rep(1,nrow(cjsdat_adjusted[cjsdat_adjusted$tagging_age == "adult",]))) 
+test2ct_adult
+
+# CANNOT RUN TEST
+# Error in m[rw, cl] : subscript out of bounds
 ```
 
-Notice that there were not enough individuals for some components, which is often the case, depending on the capture histories in your data set.
 
 
 # 2) Test2.CL: This tests whether there is a difference in the expected time of next recapture between individuals captured and not captured at t when animals are known to be alive.
 ```{R}
-
-test2cl_adult <- test2cl(cjsdat.adult.ch.gof, rep(1,nrow(cjsdat_adjusted[cjsdat_adjusted$tagging_age == "adult",])))
-test2cl_adult
-
 # try w/ all data 
 test2cl_all <- test2cl(cjsdat.ch.gof, rep(1,nrow(cjsdat_adjusted))) # Error in rep(NA, km4) : invalid 'times' argument
 test2cl_all
 
-# try w/ no single levels 
-test2cl_test <- test2cl(test.all, rep(1,nrow(test))) 
-test2cl_test
+# try w/ adults
+test2cl_adult <- test2cl(cjsdat.adult.ch.gof, rep(1,nrow(cjsdat_adjusted[cjsdat_adjusted$tagging_age == "adult",])))
+test2cl_adult
 
+# CANNOT RUN TEST, but different error this time:  
+# Error in rep(NA, km4) : invalid 'times' argument
 ```
 
-Uhoh! No tests were performed for test2cl (test_perf = “none” for all components) because of low sample sizes. These tests use contingency tables, so higher cell counts (more captures and recaptures) will increase your ability to perform the tests.
 
-Next, we perform Test 3, which tests whether marking affects survival (equal survival assumption). There are two components to Test 3 (Test3.SR and Test3.SM).
 
+NOW **Test 3**, which tests whether marking affects survival (equal survival assumption). There are two components to Test 3: Test3.SR and Test3.SM.
 
 # 3) Test3.SR: Does marking affect survival? Do individuals with previous marks have different survival rates than first-time captures?
 ```{r}
-test3sr_adult <- test3sr(cjsdat.adult.ch.gof, rep(1,nrow(cjsdat_adjusted[cjsdat_adjusted$tagging_age == "adult",])))
-test3sr_adult
-
-# Finally, a test that runs! 
-
 # try w/ all data 
 test3sr_all <- test3sr(cjsdat.ch.gof, rep(1,nrow(cjsdat_adjusted))) 
 test3sr_all
+# X^2 chi square = 1.513
+# p = 0.219
+# df = 1.0
+# sign test = 1.23
 
-# try w/ no single levels 
-test3sr_test <- test3sr(test.all, rep(1,nrow(test))) # worse than w/ the actual data
-test3sr_test
+# Try w/ adults 
+test3sr_adult <- test3sr(cjsdat.adult.ch.gof, rep(1,nrow(cjsdat_adjusted[cjsdat_adjusted$tagging_age == "adult",])))
+test3sr_adult
+# X^2 chi square = 1.409
+# p = 0.235
+# df= 1.0
+# sign test = 1.187
+
+# Try w/ juvs 
+test3sr_juv <- test3sr(cjsdat.juv.ch.gof, rep(1,nrow(cjsdat_adjusted[cjsdat_adjusted$tagging_age == "juvenile",])))
+test3sr_juv
+# Juvs = not enough levels to run
+
+# Finally, a test that runs! 
 ```
 
-Conclusion of `Test3.SR`: There is no evidence that individuals with previous marks have different survival rates than individuals caught for the first time.
+Conclusion of `Test3.SR`: There is no evidence that individuals with previous marks have different survival rates than individuals caught for the first time. 
+Positive sign test indicates an excess of marked individuals that were never seen again (Gimenez et al. 2018).
 
 
 # 4) Test3.SM: For animals seen again, does when they are recaptured depend on whether they were marked on or before time t?
 ```{r}
+# try w/ all data 
+test3sm_all <- test3sm(cjsdat.ch.gof, rep(1,nrow(cjsdat_adjusted))) 
+test3sm_all
+
+# try w/ adults 
 test3sm_adult <- test3sm(cjsdat.adult.ch.gof, rep(1,nrow(cjsdat_adjusted[cjsdat_adjusted$tagging_age == "adult",])))
 test3sm_adult
 
@@ -467,15 +468,6 @@ test3sm_adult
 # test_perf = none means that no tests were performed for test2cl because of low sample sizes
 # These tests use contingency tables, so higher cell counts (more captures and recaptures will increase ability to perform
 # tests)
-
-
-# try w/ all data 
-test3sm_all <- test3sm(cjsdat.ch.gof, rep(1,nrow(cjsdat_adjusted))) 
-test3sm_all
-
-# try w/ no single levels 
-test3sm_test <- test3sm(test.all, rep(1,nrow(test))) 
-test3sm_test
 ```
 
 Conclusion of `Test3.SM`: No tests performed due to small sample sizes. 
@@ -521,7 +513,7 @@ These estimates are problematic for many reasons:
 - Even if these were perfect data, 8 is very small. 
 - And, we're missing so many levels and have to add ~50% of capture history types, which amounts to adding ~30% of dummy data in order to even be able to fit models. We just don't have enough to produce reliable estimates. 
 - Model convergence/warning issues are not ideal. 
-- Model estimates seem off - Probability of survival of 0.87 seems extremely high for any wild animal; likewise, probability of capture of 0.49 *might* make sense if the tagged bird estimate wasn't so much lower (again, given that the release bird dataset has only 8 observations + 3 dummy variables, it doesn't make intuitive sense to me that overall capture probabilities would be 0.20 higher for unmarked birds than marked birds).
+- Model estimates seem off - Probability of survival of 0.87 seems extremely high for any wild animal; likewise, probability of capture of 0.49 *might* make sense if the tagged bird estimate wasn't so much lower (again, given that the release bird dataset has only 8 observations + 3 dummy variables, it doesn't make ifzntuitive sense to me that overall capture probabilities would be 0.20 higher for unmarked birds than marked birds).
 - SO, for all of these reasons, I do not think these estimates are reliable, and I don't think this is something we want to include in our paper. 
 
 
