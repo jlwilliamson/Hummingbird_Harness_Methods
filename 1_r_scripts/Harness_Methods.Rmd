@@ -57,8 +57,6 @@ setwd("/Users/Jessie/Dropbox (MSBbirds)/Rdirectory/Hummingbird_Harness_Methods")
 recaps <- read.csv("0_raw_data/Table2_harness_methods_recapture_data.csv", stringsAsFactors = TRUE) # n=7 geolocator individuals 
 recaps.reshape <- read.csv("0_raw_data/Table2_harness_methods_recapture_data_reshape.csv", stringsAsFactors = TRUE) # for plotting, below
 
-sl <- read.csv("Hummingbird_Survival_Estimates_forR.csv", stringsAsFactors = TRUE) # Hummingbird survival rate lit review
-
 # Check data structure
 str(recaps)
 str(recaps.reshape)
@@ -312,22 +310,6 @@ lsmeans(m3, list(pairwise ~ capture_month           ), adjust = "tukey")
 
 ```
 
-
-# Basic plot of hummingbird survival rates from the temperate zone and tropics 
-```{r}
-library(ggplot2)
-ggplot(sl, aes(x = species, y = phi, ymin = phi-phi_se, ymax = phi+phi_se)) + 
-  coord_flip() + # This flips x and y axes
-    geom_linerange() + 
-    geom_pointrange()
-
-# You need to explicitly specify the width for dodging
-# p + geom_linerange(aes(ymin = phi-1, ymax = y+1),
-#   position = position_dodge(width = 0.9))
-
-# Aesthetics haven't been tweaked at all! 
-
-```
 
 --------
 

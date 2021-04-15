@@ -65,6 +65,7 @@ setwd("/Users/Jessie/Dropbox (MSBbirds)/Rdirectory/Hummingbird_Harness_Methods")
 
 # load in data 
 ```{R}
+sl <- read.csv("Hummingbird_Survival_Estimates_forR.csv", stringsAsFactors = TRUE) # Hummingbird survival rate lit review
 cjs <- read.csv("Patagona_Cormack-Jolly-Seber_04-06-21.csv", stringsAsFactors = TRUE) # capture history data 
 str(cjs) # Check data structures
 # 'ch' capture histories must be characters! (And they're currently integers...)
@@ -240,10 +241,126 @@ Rationale from the site: ML searches seem to reach the same results whether or n
 
 More info here: http://phylo.wikidot.com/biogeobears-warnings-to-ignore-mostly
 
-And, proceed. 
+ 
+ 
+But, before we move full steam ahead: 
+
+# TEST OF SENSITIVITY TO ADDING LEVELS 
+We know we have no option but to add a level of "111" OR to swap a level of "011" for "111" in order to get our models to converge. We've assessed (above) the impacts to Phi1 and p2 of adding a single level of "111" to our data, but now we're curious about how, more broadly, the addition of data affects estimates. **To assess this** we'll quickly compare the "Swap 011 for 111" dataset with "dummy" datasets with different levels of "111" added (point estimates, standard errors, and CIs).
+```{R}
+# What happens if I switch a 011 year2-3 bird to a 111 to fill in years 1-2?
+test <- cjs # quick copy data frame 
+test[test$nk=="252134" & test$ch=="011",][, "ch"] <- 111 # swap levels 
+tdat <- subset(test, select = c(ch, # Capture history
+                                 tagging_age
+                                        ) )
+cjs.test <- crm(tdat, hessian=TRUE) # 47 capture histories collapsed into 8
+predict(cjs.test) # No dummy but swap 011 for 111; Phi = 0.51; p = 0.28
 
 
-# Fit and compare a set of CJS models 
+# Now, how sensitive are tests to dummy levels? 
+# Make dummy trial datasets 
+cjsdat.2level <- rbind(cjsdat, data.frame(ch = c(rep("111", 2)), tagging_age = rep("adult", 2)))
+cjsdat.3level <- rbind(cjsdat, data.frame(ch = c(rep("111", 3)), tagging_age = rep("adult", 3)))
+cjsdat.4level <- rbind(cjsdat, data.frame(ch = c(rep("111", 4)), tagging_age = rep("adult", 4)))
+cjsdat.5level <- rbind(cjsdat, data.frame(ch = c(rep("111", 5)), tagging_age = rep("adult", 5)))
+cjsdat.6level <- rbind(cjsdat, data.frame(ch = c(rep("111", 6)), tagging_age = rep("adult", 6)))
+
+
+# Run tests and get estimates from Phi(.)p(.) models 
+cjs.m1; predict(cjs.m1) # 1 dummy level of 111; Phi = 0.48, p = 0.34
+
+cjs.2level <- crm(cjsdat.2level, hessian=TRUE)
+predict(cjs.2level) # 2 dummy levels of 111; Phi = 0.45, p = 0.43
+
+cjs.3level <- crm(cjsdat.3level, hessian=TRUE)
+predict(cjs.3level) # 2 dummy levels of 111; Phi = 0.44, p = 0.51
+
+cjs.4level <- crm(cjsdat.4level, hessian=TRUE)
+predict(cjs.4level) # 2 dummy levels of 111; Phi = 0.44, p = 0.58
+
+cjs.5level <- crm(cjsdat.5level, hessian=TRUE)
+predict(cjs.5level) # 2 dummy levels of 111; Phi = 0.44, p = 0.63
+
+cjs.6level <- crm(cjsdat.6level, hessian=TRUE)
+predict(cjs.6level) # 2 dummy levels of 111; Phi = 0.45, p = 0.88
+
+# Make a data frame with # levels, survival estimates, capture prob estimates, and confidence intervals
+sensitivity <- data.frame(
+              "dataset" = c("Dummy_0_Swap011For111", "Dummy_1level", "Dummy_2level", "Dummy_3level", "Dummy_4level", 
+                            "Dummy_5level", "Dummy_6level"), 
+              "phi" = c(0.5119027, 0.4835739,0.452329,0.4399577,0.4375787,0.4408579,0.4474458), 
+              "phi_se" = c(0.3679488, 0.3181648,0.2505397,0.2071456,0.1772325,0.1555582,0.1392401),
+              "phi_lcl" = c(0.0552666,0.07156895,0.1021542,0.1313451,0.1594271,0.1862501,0.2116792),
+              "phi_ucl" = c(0.9495006,0.919189,0.857048,0.8032053,0.7614249,0.7309014,0.7094761),
+              "p" = c(0.2848852, 0.337624, 0.4334863,0.5146297,0.5817116,0.6367171,0.6818362),
+              "p_se" = c(0.2505484,0.2685021, 0.2845168,0.282199,0.2697917,0.2527882, 0.2343671),
+              "p_lcl" = c(0.03452859,0.04621478, 0.07320711, 0.1037905, 0.1366493, 0.1706729,0.2050102),
+              "p_ucl" = c(0.8160956,0.8428168, 0.881128, 0.9066052,0.9243526, 0.9372125,0.9468346)
+              )
+```
+
+
+# Make a boxplot with confidence intervals showing how estimates shift
+```{R}
+# Phi (survival estimates)
+survival.comp <- ggplot(sensitivity, aes(x=dataset, y=phi)) + 
+      geom_errorbar(mapping=aes(ymin=phi_lcl, ymax=phi_ucl), width=0, size=4.1, color="grey60", alpha=0.5) + # CIs
+      geom_errorbar(mapping=aes(ymin=phi-phi_se, ymax=phi+phi_se), width=0.07, size=1, color="firebrick") + # se
+      geom_point(mapping=aes(y=phi), size=5, shape=21, fill="black") +
+     # coord_flip() + 
+      scale_y_continuous(limits=c(0,1.0), breaks=c(0,0.25,0.5,0.75,1.0)) +
+      scale_x_discrete(labels=c("Swap 011 for 111", "1 Dummy Level", "2 Dummy levels",
+                                "3 Dummy Levels", "4 Dummy Levels", "5 Dummy Levels", "6 Dummy Levels")) +
+      theme_classic() +     
+      theme(axis.text.x=element_text(angle=45, hjust=1.0)) + 
+          # ggtitle("(a)") + 
+      theme(plot.title.position="plot", plot.title = element_text(face="bold")) + 
+          # parameter "plot" specifies that you want "title" flush with y-axis; bold face makes panel header bold 
+          # This is good for labeling figure panels! Avoids having to manually toy w/ hjust and vjust
+      labs(x=" ", y = expression("Survival Rate"~"("~italic(phi)~")")) + # x blank because label in bottom panel below
+      theme(axis.title=element_text(size=12), axis.text.y=element_text(size=12), axis.text.x=element_text(size=10)) # These go: y-axis title, y-axis ticks, x-axis species labels (italic)
+print(survival.comp)
+ggsave(survival.comp, filename="SurvivalEstimateComparison_TestDatasets_DummyData.pdf", height=7, width=9, units="in")
+  
+
+# p (Probablity of capture estimates)
+capture.comp <- ggplot(sensitivity, aes(x=dataset, y=p)) + 
+      geom_errorbar(mapping=aes(ymin=p_lcl, ymax=p_ucl), width=0, size=4, color="grey60", alpha=0.5) + # CIs 
+      geom_errorbar(mapping=aes(ymin=p-p_se, ymax=p+p_se), width=0.07, size=1, color="dodgerblue2") + # se
+      geom_point(data=sensitivity, mapping=aes(y=p), size=5, shape=21, fill="black") +
+     # coord_flip() + 
+      scale_y_continuous(limits=c(0,1.0), breaks=c(0,0.25,0.5,0.75,1.0)) +
+      scale_x_discrete(labels=c("Swap 011 for 111", "1 Dummy Level", "2 Dummy levels", 
+                                "3 Dummy Levels", "4 Dummy Levels", "5 Dummy Levels", "6 Dummy Levels")) +
+      theme_classic() +     
+      theme(axis.text.x=element_text(angle=45, hjust=1.0)) + 
+          # ggtitle("(a)") + 
+      theme(plot.title.position="plot", plot.title = element_text(face="bold")) + 
+          # parameter "plot" specifies that you want "title" flush with y-axis; bold face makes panel header bold 
+          # This is good for labeling figure panels! Avoids having to manually toy w/ hjust and vjust
+      labs(x="Test Dataset", y = expression("Capture Probability"~"("~italic(p)~")")) + 
+      theme(axis.title=element_text(size=12), axis.text.y=element_text(size=12), axis.text.x=element_text(size=10)) # These go: y-axis title, y-axis ticks, x-axis species labels (italic)
+print(capture.comp)
+ggsave(capture.comp, filename="CaptureProbabilityComparison_TestDatasets_DummyData.pdf", height=7, width=9, units="in")
+
+library(patchwork)
+dummy.data.comparison.plot <- (survival.comp / capture.comp +  # the / literally means put p14 on top of p15
+                                  plot_layout(guides = "collect")) # "collates" and combines one common legend 
+                                  # In order for plot_layout to "collect" legend, must have printed legend for indiv plots above
+plot(dummy.data.comparison.plot)
+
+ggsave(dummy.data.comparison.plot, filename = "Dummy_Data_Comparison_Plot.pdf", bg="transparent", height=6, width=5, units="in")
+
+```
+
+**What these plots tell us**: 
+- Survival estimates are remarkably stable (in fact, they decrease *slightly* when we add more dummy levels). The se and CI estimates shrink (i.e., get better) with the more data we add - this is to be expected. The good news: Increasing dummy data doesn't affect point estimates much (though we do gain more confidence in these estimates), and there isn't a substantive difference in surival rate for Phi(.)p(.) moddels between "Swap 011 for 111" data and "1 dummy level of 111" data. 
+- Probability of capture increases somewhat predictably as we increase the number of dummy levels in the data. *p* is lowest for the "Swap 011 for 111" dataset, suggesting that adding a single level of 111 has the greatest impact on estimates of *p* in the model. 
+
+
+
+# NOW, ACTUALLY FIT AND COMPARE CJS MODELS  
 We'll use James Paterson's function for generating subsets of models to fit and then compare models w/ a nice table output.
 **See CUT script from code of James' I modified for individually specifying models to run.
 ```{r}
@@ -306,6 +423,14 @@ What this model list tells us:
 - The top model is the simplest model that assumes constant survival and detection probability. 
 - $Phi= Probability of a Patagona surviving between capture events was 0.48
 - $p = Probability of catching a Patagona during a capture event was 0.34
+
+
+
+
+
+
+JESSIE NEEDS TO EDIT ALL BELOW TO MAKE SENSE /MAKE SURE CODE IS ANNOTATED FOR GIT UPLOAD
+
 
 
 # # EVALUATE GOODNESS OF FIT (GOF) AND OVERDISPERSION
@@ -376,6 +501,7 @@ overall_CJS(cjsdat.juv.ch.gof, cjsdat.juv.freq) # juv overall
 
 # CANNOT RUN TEST
 # Error in m[rw, cl] : subscript out of bounds
+
 ```
 
 From somewhere online: In other words: If you are receiving the error message “subscript out of bounds” you should check whether you are trying to use a data element that does not exist in your data.
@@ -471,6 +597,98 @@ test3sm_adult
 ```
 
 Conclusion of `Test3.SM`: No tests performed due to small sample sizes. 
+
+
+
+-----
+
+
+# PLOT: Point estimate comparison of hummingbird survival rates from the literature
+```{r}
+# First set levels so data appears in proper order 
+
+# library(forcats) # This is easiest way, but this blanket-relevels by species, which we don't want
+# sl <- sl %>% mutate(species = fct_reorder(species, species_num)) # now relevel based on plot.order 
+# levels(sl$species) # check that releveling worked 
+
+sl$common.name <- factor(sl$common_name
+                       , levels = c("Ruby-throated Hummingbird_F1",
+                                    "Ruby-throated Hummingbird_M1", 
+                                    "Ruby-throated Hummingbird_F2", 
+                                    "Ruby-throated Hummingbird_M2", 
+                                    "Ruby-throated Hummingbird_F3", 
+                                    "Ruby-throated Hummingbird_M3", 
+                                    "Ruby-throated Hummingbird_F4",  
+                                    "Ruby-throated Hummingbird_M4",
+                                    "Mexican Violetear",
+                                    "White-eared Hummingbird",
+                                    "Long-tailed Hermit",
+                                    "Green-billed Hermit_1",
+                                    "Green-billed Hermit_2",
+                                    "Speckled Hummingbird",
+                                    "Green-crowned Brilliant",
+                                    "Long-billed Hermit",
+                                    "Hyacinth Visorbearer_F",
+                                    "Hyacinth Visorbearer_M",
+                                    "Giant Hummingbird"))
+
+# Phi (survival estimates) from all hummingbirds
+# ggplot(sl, aes(x=common_name, y=phi)) + 
+#       geom_errorbar(mapping=aes(ymin=phi_lci, ymax=phi_uci), width=0, size=4.1, color="grey60", alpha=0.5) + # CIs
+#       geom_errorbar(mapping=aes(ymin=phi-phi_se, ymax=phi+phi_se), width=0.07, size=1, color="olivedrab3") + # se
+#       geom_point(mapping=aes(y=phi), size=5, shape=21, fill="black") +
+#      # coord_flip() + 
+#       labs(x = "Species", y = "Survival Rate") +
+#       theme(axis.text.x=element_text(angle=45, hjust=1.0)) + 
+#     #  ggtitle("Survival Rate Comparison") +
+#       theme_classic() 
+# Width controls width of END CAPS on error bars 
+# size controls size of points and lines
+
+hum.survival <- ggplot(data=sl, aes(x=common.name, y=phi)) + 
+      geom_errorbar(aes(ymin=phi_lci, ymax=phi_uci), width=0.0, size=4.1, color="grey84") +
+      geom_errorbar(aes(ymin=phi-phi_se, ymax=phi+phi_se), width=0.13, size=1, color="gray28") + # purple 3 is pretty
+      geom_point(data=sl[sl$sex=="female",], aes(y=phi, x=common.name), # Plot female points
+            shape=16, color="goldenrod2", size=6) +
+      geom_point(data=sl[sl$sex=="male",], aes(y=phi, x=common.name), # Plot male points another color 
+            shape=16, color="turquoise3", size=6) + 
+      geom_point(data=sl[sl$sex=="species-level",], aes(y=phi, x=common.name), # Plot species-level estimates in black
+            shape=16, color="black", size=6) +
+     # geom_point(mapping=aes(y=phi), size=5, shape=21, fill="black") + # Plot all points at once 
+      scale_y_continuous(limits=c(0,1.0), breaks=c(0,0.25,0.5,0.75,1.0)) +
+      scale_x_discrete(labels=c("Archilochus colubris [1]", "Archilochus colubris [1]",
+                              "Archilochus colubris [2]", "Archilochus colubris [2]",
+                              "Archilochus colubris [3]", "Archilochus colubris [3]",
+                              "Archilochus colubris [4]", "Archilochus colubris [4]",
+                              "Colibri thalassinus", "Hylocharis leucotis", "Phaethornis superciliosus",
+                              "Phaethornis malaris [5]", "Phaethornis malaris [6]","Adelomyia melanogenys", 
+                              "Heliodoxa jacula", "Phaethornis baroni","Augastes scutatus [7]", 
+                              "Augastes scutatus [7]", "Patagona gigas")) +
+      theme_classic() +     
+      theme(axis.text.x=element_text(angle=45, hjust=1.0)) + 
+          # ggtitle("(a)") + 
+      theme(plot.title.position="plot", plot.title = element_text(face="bold")) + 
+          # parameter "plot" specifies that you want "title" flush with y-axis; bold face makes panel header bold 
+          # This is good for labeling figure panels! Avoids having to manually toy w/ hjust and vjust
+      labs(x="Species", y = expression("Survival Estimate"~"("~italic(phi)~")")) + 
+      theme(axis.title=element_text(size=12), axis.text.y=element_text(size=12), axis.text.x=element_text(size=10, face="italic")) # These go: y-axis title, y-axis ticks, x-axis species labels (italic)
+print(hum.survival)
+ggsave(hum.survival, filename="hum.survival_LiteratureReviewPointEstimates.pdf", height=7, width=9, units="in")
+# Charette et al. = [1]; Mulvihill et al. 1992 = [2]; Baumgartner 1989 = [3]; Hilton & Miller 2003 = [4]; Blake & Loiselle 2008 = [5]; Blake & Loiselle 2013 = [6]; Rodrigues et al. 2013 = [7]; Present study = [8]
+
+ 
+# Is y-axis phi symbol italicized? 
+```
+
+
+
+
+
+
+
+
+
+
 
 
 ----
