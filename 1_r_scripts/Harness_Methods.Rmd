@@ -1,11 +1,16 @@
 ---
 title: "Hummingbird Harness Methods"
 author: "Jessie Williamson"
-date: "Created 10/20/2020; last revised 03/31/21"
+date: "Created 10/20/2020; last revised 04/28/21"
 output: html_document
 ---
 
-This is a super brief script meant to make Figure S1 for Williamson and Witt (In Review), "Alightweight body harness for tracking hummingbirds" showing mass changes in Giant Hummingbirds tracked and recaptured using our harness design. 
+Brief script for Williamson & Witt (In Revision), "A lightweight body harness for tracking hummingbirds". It includes: 
+**1)** t-test and Wilcoxon signed-rank test to analyze differences in mass between deployment and recapture (spoiler alert: there are none). 
+**2)** linear mixed effects models to test for effects of time of day and season, respectively, on body mass. 
+**3** Code to produce Figures S1 and S2
+
+See accompanying script 'HarnessMethods_CJS.Rmd' for Cormack-Jolly-Seber survival model code and other plots. 
 
 
 ```{R, echo=FALSE}
