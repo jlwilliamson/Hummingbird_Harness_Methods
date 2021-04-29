@@ -482,7 +482,7 @@ sl$common_name <- factor(sl$common_name
                                     "Hyacinth Visorbearer_M",
                                     "Giant Hummingbird"))
 
-FigureS5 <- ggplot(data=sl, aes(x=common_name, y=phi)) + 
+FigureS3 <- ggplot(data=sl, aes(x=common_name, y=phi)) + 
       geom_hline(yintercept=0.42, linetype="longdash", size=0.4, color="red2", alpha=0.5) +
       geom_errorbar(aes(ymin=phi_lci, ymax=phi_uci), width=0.0, size=4.1, color="grey84") + # CI
       geom_errorbar(aes(ymin=phi-phi_se, ymax=phi+phi_se), width=0.13, size=1, color="gray28") + # se; purple 3 is pretty
@@ -508,8 +508,8 @@ FigureS5 <- ggplot(data=sl, aes(x=common_name, y=phi)) +
           # This is good for labeling figure panels! Avoids having to manually toy w/ hjust and vjust
       labs(x="Species", y = expression("Survival Estimate"~"("~italic(phi)~")")) + # Phi is supposedly italicized...
       theme(axis.title=element_text(size=12), axis.text.y=element_text(size=12), axis.text.x=element_text(size=10, face="italic")) # These go: y-axis title, y-axis ticks, x-axis species labels (italic)
-print(FigureS5)
-ggsave(FigureS5, filename="FigureS5_LiteratureReviewPointEstimates_04-15-21.pdf", height=7, width=9, units="in")
+print(FigureS3)
+ggsave(FigureS3, filename="FigureS3_SurvivalRateComparison_04-29-21.pdf", height=7, width=9, units="in")
 
 # REFS: Charette et al. = [1]; Mulvihill et al. 1992 = [2]; Baumgartner 1989 = [3]; Hilton & Miller 2003 = [4]; 
 # Blake & Loiselle 2008 = [5]; Blake & Loiselle 2013 = [6]; Rodrigues et al. 2013 = [7]
