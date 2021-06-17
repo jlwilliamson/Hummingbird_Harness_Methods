@@ -1,11 +1,13 @@
 ---
 title: "Cormack-Jolly-Seber Mark-Recapture Models"
 author: "Jessie Williamson"
-date: "Created 4/3/2021; last revised 4/28/21 "
+date: "Created 4/3/2021; last revised 06/17/21 "
 output: html_document
 ---
 
-Script for Williamson & Witt (In Revision), "A lightweight body harness for tracking hummingbirds". It includes: 
+Script for Williamson & Witt, "A lightweight body harness for tracking hummingbirds", *Journal of Avian Biology*. 
+
+Script includes: 
 **1)** Code and extensive notations for Cormack-Jolly-Seber (CJS) models to estimate apparent survival and recapture probabilities from our geolocator birds *and* from our two satellite birds. AND, troubleshooting, diagnostic plots, and diagnostic test attempts. 
 **2)** Code to produce Figure 3 comparing published survival rates for hummingbirds. 
 
@@ -15,7 +17,7 @@ Cormack-Jolly-Seber models are mark-recapture models used to estimate two parame
 1) Detection probability (*p*t, the probability of encountering a live animal at time t)
 2) Apparent survival (*Φ*t, the prob of an animal surviving and remaining in the study area between time t and t + 1).
 
-Note that “Apparent” survival confounds surviving *and* remaining in the study area. In this script, I use “survival” when describing apparent survival for simplicity.
+Note that “Apparent” survival confounds surviving *and* remaining in the study area. In this script (for simplicity), I use “survival” when describing apparent survival.
 
 ---
 
@@ -45,7 +47,7 @@ library(stats)
 library(gplots)
 library(ggplot2)
 library(stats4) # Forces knitr to work when it's being wonky
-library(PMCMR) #Allows Kruskal-Wallis post-hocs
+library(PMCMR) # Allows Kruskal-Wallis post-hocs
 library(viridis)
 library(lme4)
 library(sjstats)
@@ -84,7 +86,7 @@ str(cjs) # Check data structures
 
 
 # Wrangle & Subset data 
-We want 'ch' capture histories (MAKE SURE THESE ARE CHARACTER STRINGS WITH LEADING ZEROS!) and tagging_age as a blocking variable. Can't use sex because can't ID Patagona to sex without gonads. 
+We want 'ch' capture histories (MAKE SURE THESE ARE CHARACTER STRINGS WITH LEADING ZEROS!) and tagging_age as a blocking variable. Can't use sex because can't ID *Patagona* to sex without gonads. 
 ```{r}
 # Get the data into the format you need
 capture.seasons <- c("Year1_Jan2017", "Year2_Nov2017.Jan2018", "Year3_Dec2018.Jan2019") # Define capture seasons
@@ -138,12 +140,12 @@ cjs.basic <- crm(cjsdat, hessian=TRUE) # 47 capture histories collapsed into 8
 ```
 
 
-*THE REASON FOR THIS ERROR* (this took a lot of digging to arrive at): 
+*THE REASON FOR THIS ERROR* (this took A LOT of digging to arrive at): 
 Ultimately, small sample size and lack of detection of birds in Year2 that were tagged in Year1 (i.e., anything with a "11" in the first two characters) means that the behind-the-scenes math doesn't work. 
 
 This is because without a level of "111", I can't calculate Phi1 to estimate survival from year 1 to year 2 (I can't get this estimate with the single level of "101" that I have from BC377). Essentially, the estimate for p2 = 0, and because I also have no "110"s, the estimate for Phi1p2 = 0. That means that when I go to calculate Phi1 (which is Phi1p2/p2, I get 0/0 = Error!).
 
-- The easiest solution is to change our "101" from BC377 to "111", which would affect capture probability estimates but not survival. This also makes more sense and seems to be the most minor modification possible given that this bird *did* survive for two years. HOWEVER, When I make this change, the model still doesn't run. I can hand-calculate Phi1, Phi1p2, and p2, but I cannot get the model to run in R with this structure (more on these hand estimates below). I assume what's happening is that R knows something - a value - should exist to divide by, but instead it's coming up with a null/empty and can't compute. 
+- The easiest solution is to change our "101" from BC377 to "111", which would affect capture probability estimates but not survival. This also makes more sense and seems to be the most minor modification possible given that this bird *did* survive for two years. HOWEVER, When I make this change, the model still doesn't run. I can hand-calculate Phi1, Phi1p2, and p2, but I cannot get the model to run in R with this structure (more on these hand estimates below). I assume what's happening is that R knows something - a value - should exist to divide by (i.e., a denominator), but instead it's coming up with a null/empty and can't compute. 
 - Having multiple "101"s wouldn't help because p2 would still be zero. 
 - And, having multiple "110"s wouldn't help, because I would get a value for Phi1p2, but I'd still be dividing by a denominator p2 of zero, which results in an error. 
 
@@ -151,7 +153,7 @@ This is because without a level of "111", I can't calculate Phi1 to estimate sur
 **1)** Substitute one of our "011" Year 2-3 birds for "111" to fill missing gaps between Years 1-2. This should have negligible effects on survival and should keep capture probabilities consistent with what we observed. This would be the most conservative approach that does not inflate number of devices deployed, tags retrieved, and there's nothing I'll misinterpret with regard to year effects. 
 **2)** Add in one dummy level of "111" in order that the matrix math behind the scenes works. But, adding one level of "111" will inflate survival and capture probability estimates slightly (I have also tried adjusting proportions of "111"s added in order to match the hand calculated survival and capture probabilities, and it just doesn't work). 
 
-Since Option 1 (subbing "111" in for one "011" level) is the most parsimonious solution, we'll opt for that and assess "dummy levels" below (see diagnostic plots exploring these options).
+Since Option 1 (subbing "111" in for one "011" level) is the most parsimonious solution, we'll proceed this way and assess "dummy levels" below (see diagnostic plots exploring these options).
 
 
 # Update CJS data by swapping 011 for 111. 
@@ -167,7 +169,7 @@ cjsdat_adjusted <- subset(cjs2, select = c(ch, tagging_age)) # Modeling data fra
 
 # Now fit the CJS model with updated data 
 - We'll assume equal time intervals (time.interval argument) because all recapture attempts occurred during roughly the 
-same window of the breeding season. But, if we do want to play with time, capture interval is 1/12 months = ~0.08/month (so ~0.17 for 2 month interval and 0.83 for 10 months; see Blake and Loiselle 2008)
+same window of the breeding season. But, if we do want to play with time, capture interval is 1/12 months = ~0.08/month (so ~0.17 for 2 month interval and 0.83 for 10 months; see Blake and Loiselle 2008 cited in paper)
 - We will not consider a time-since capture (TSM) model because we have a relatively short study period (3 years), overall low sample size, and very low recapture rate. Additionally, this would only matter for one individual (BC377) because all others were recaptured in the year following initial deployment.
 ```{r}
 # Create a basic CJS model (constant survival and detection) with:
@@ -194,9 +196,9 @@ predict(cjs.m1)
 
 Note about this warning: Some googling retrieved a BioGeoBEARS page w/ descriptions of warnings that can and can't be ignored. Based on this page, it looks like I CAN ignore this warning message the model is throwing at me. 
 
-Rationale from the site: ML searches seem to reach the same results whether or not this warning is thrown, as long as the ML parameter values actually are within the user-specified bounds.
+Rationale: ML searches seem to reach the same results whether or not this warning is thrown, as long as the ML parameter values actually are within the user-specified bounds.
 
-More info here: http://phylo.wikidot.com/biogeobears-warnings-to-ignore-mostly
+Source info here: http://phylo.wikidot.com/biogeobears-warnings-to-ignore-mostly
 
  
 # NOW, ACTUALLY FIT AND COMPARE CJS MODELS  
@@ -259,13 +261,13 @@ cjs.global <- cjs.models[[1]] # Our most complex model, Phi(age)p(age)
 ```
 
 What this model list tells us: 
-- The top model is the simplest model that assumes constant survival and detection probability. 
+- The top model is the simplest model, which assumes constant survival and detection probability. 
 - $Phi= Probability of a Patagona surviving between capture events was 0.51
 - $p = Probability of catching a Patagona during a capture event was 0.28
  
  
 # Based on these numbers, how many devices *might* we expect to retrieve? 
-...fully acknowledging that this is a very coarse approximation...
+...fully acknowledging that this is a very coarse approximation.
 ```{R}
 num.deployed <- 47
 phi.best <- plogis(cjs.top$results$beta$Phi); phi.best
@@ -315,7 +317,7 @@ cjsdat.juv.ch.gof <- cjsdat_adjusted$ch[cjsdat_adjusted$tagging_age == "juvenile
 
 
 **GOF TESTS in R2ucare:** 
-- These tests have VERY confusing names and generally poor documentation (and online tutorials conflict descriptions written about tests in Gimenez et al. 2018). They do not go in order! i.e., Gimenez et al. describes running test2ct() and then test3sr() versus the two 'test2's and two 'test3's in order. 
+- These tests have VERY confusing names and confusing documentation (and online tutorials conflict w/ descriptions written about tests in Gimenez et al. 2018). Names and numbers do not go in order! i.e., Gimenez et al. describes running test2ct() and then test3sr() versus the two 'test2's and two 'test3's in order. 
 - Test 1 = the omnibus or overall test ("overall_CJS"). It asks: Overall, is there evidence that animals have equal capture probabilities and equal survival? Tells us if there’s a problem, but not where (which events) or why (which assumption is violated).
 - Tests 2 (Test2.CT and Test2.CL) and Tests 3 (Test3.SR and Test3.SM) test for the effects of transients and trap-dependence. Tutorials online describe them as evaluating the effects of marking on survival, but the Gimenez et al. 2018 paper introducing the tests does not describe them that way. 
 
@@ -453,7 +455,7 @@ test2cl_adult
 
 Let's put our survival rates into context by comparing them to the survival rates of other hummingbird species from the literature. 
 
-# PLOT: Point estimate comparison of hummingbird survival rates from the literature
+# Figure S3: Plot of point estimate comparison of hummingbird survival rates from the literature
 ```{r}
 # First set levels so data appears in proper order 
 
@@ -590,7 +592,7 @@ We know we have no option but to add a level of "111" OR to swap a level of "011
 ```{R}
 # What happens if I switch a 011 year2-3 bird to a 111 to fill in years 1-2?
 # NOTE: THIS SWAPPING SOLUTION IS WHAT WE WENT WITH FOR OUR PAPER BECAUSE IT WAS THE MOST PARSIMONIOUS AND IMPACTED
-# SURVIVAL AND CAPTURE PROBABILITY ESTIMATES LEAST
+# SURVIVAL AND CAPTURE PROBABILITY ESTIMATES *LEAST*
 test <- cjs # quick copy data frame 
 test[test$nk=="252134" & test$ch=="011",][, "ch"] <- 111 # swap levels 
 tdat <- subset(test, select = c(ch, # Capture history
@@ -694,7 +696,7 @@ ggsave(dummy.data.comparison.plot, filename = "Dummy_Data_Comparison_Plot.pdf", 
 ```
 
 **What these plots tell us**: 
-- Survival estimates are remarkably stable (in fact, they decrease *slightly* when we add more dummy levels). The se and CI estimates shrink (i.e., get better) with the more data we add - this is to be expected. The good news: Increasing dummy data doesn't affect point estimates much at all (though we do gain more confidence in these estimates), **and** there isn't a substantive difference in surival rate for Phi(.)p(.) moddels between "Swap 011 for 111" data and "1 dummy level of 111" data. 
+- Survival estimates are remarkably stable (in fact, they decrease *slightly* when we add more dummy levels). The standard error (se) and CI estimates shrink (i.e., get better) with the more data we add - this is to be expected. The good news: Increasing dummy data doesn't affect point estimates much at all (though we do gain more confidence in these estimates), **and** there isn't a substantive difference in surival rate for Phi(.)p(.) moddels between "Swap 011 for 111" data and "1 dummy level of 111" data. 
 - Probability of capture increases somewhat predictably as we increase the number of dummy levels in the data. *p* is lowest for the "Swap 011 for 111" dataset, suggesting that adding a single level of 111 has the greatest impact on estimates of *p* in the model. 
 - To clarify: We opted for the "swap 011 for 111" method for our paper (most parsimonious, has the smallest effect on estimates), describe this in Methods, and leave these process notes here for transparency and reproducibility. Ah, the quirks of working with a small dataset!
 
@@ -730,8 +732,6 @@ phi.dot.org - advice for adding time-since-marking data: http://www.phidot.org/f
 
 Laake et al. 2013 - Marked package vignette: https://cran.r-project.org/web/packages/marked/vignettes/markedVignette.html
 
-
-
 --------
 
 
@@ -742,4 +742,3 @@ sessionInfo()
 
 
 # End 
-
