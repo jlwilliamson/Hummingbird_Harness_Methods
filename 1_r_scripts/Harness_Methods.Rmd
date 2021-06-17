@@ -1,11 +1,13 @@
 ---
 title: "Hummingbird Harness Methods"
 author: "Jessie Williamson"
-date: "Created 10/20/2020; last revised 04/28/21"
+date: "Created 10/20/2020; last revised 06/17/21"
 output: html_document
 ---
 
-Brief script for Williamson & Witt (In Revision), "A lightweight body harness for tracking hummingbirds". It includes: 
+Brief script for Williamson & Witt, "A lightweight body harness for tracking hummingbirds", *Journal of Avian Biology*.
+
+Script includes: 
 **1)** t-test and Wilcoxon signed-rank test to analyze differences in mass between deployment and recapture (spoiler alert: there are none). 
 **2)** linear mixed effects models to test for effects of time of day and season, respectively, on body mass. 
 **3** Code to produce Figures S1 and S2
@@ -39,7 +41,7 @@ library(stats)
 library(gplots)
 library(ggplot2)
 library(stats4) # Forces knitr to work when it's being wonky
-library(PMCMR) #Allows Kruskal-Wallis post-hocs
+library(PMCMR) # Allows Kruskal-Wallis post-hocs
 library(viridis)
 library(lme4)
 library(sjstats)
@@ -81,13 +83,13 @@ capture_time: Time of capture (24 hour format)
 capture_month: month of capture
 notes: notes pertaining to estimations of capture time (for some birds only)
 
-Note: I quickly converted the "recaps" data frame into long format in Excel super quickly before beginning, but this can be done in R as well (and it's better to do it in R).
+Note: I converted the "recaps" data frame into long format in Excel super quickly before beginning, but this can be done in R as well (and it's better to do it in R).
 
 
 # Wrangle data 
 ```{r}
 # Rename one cumbersome column 
-names(recaps)[names(recaps) == "harness_neck_loop_measurement"] <- "neck_loop" # Make this column header simpler 
+names(recaps)[names(recaps) == "harness_neck_loop_measurement"] <- "neck_loop" # Make column header simpler 
 
 # Make sure mass difference is calculated properly 
 recaps$mass_diff <- recaps$recapture_mass - recaps$deployment_mass
@@ -326,7 +328,4 @@ sessionInfo()
 
 
 # End 
-
-
-
 
