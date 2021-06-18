@@ -10,3 +10,6 @@ Folder `1_r_scripts1` contains:
 `HarnessMethods_CJS.Rmd`: Code associated with data wrangling, running, and troubleshooting Cormack-Jolly-Seber (CJS) models. Extensive annotations to describe many quirks associated with using a small dataset for these models. This script also includes code to produce plots to compare the sensitivity of survival rate and probability of capture estimates across various test datasets (not report in MS but part of procedural duty), as well as Figure 3, a plot to compare survival rate estimates for hummingbird species described from the literature. Data for this plot were compiled from the literature into Table 2. 
 
 Any figure *not* listed in these scripts was produced in Adobe Illustrator. See .xlsx files for metadata (tab 2 in each file).
+
+Data archived on Dryad: 
+Williamson, Jessie L.; Witt, Christopher C. (2021), A lightweight backpack harness for tracking hummingbirds, Dryad, Dataset, https://doi.org/10.5061/dryad.pzgmsbcmb
