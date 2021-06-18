@@ -1,7 +1,7 @@
 ---
 title: "Cormack-Jolly-Seber Mark-Recapture Models"
 author: "Jessie Williamson"
-date: "Created 4/3/2021; last revised 06/17/21 "
+date: "Created 4/3/2021; last revised 06/18/21 "
 output: html_document
 ---
 
@@ -72,8 +72,8 @@ setwd("/Users/Jessie/Dropbox (MSBbirds)/Rdirectory/Hummingbird_Harness_Methods")
 
 # load in data 
 ```{R}
-sl <- read.csv("TableS2_Hummingbird_Survival_Estimates_forR_04-15-21.csv", stringsAsFactors = TRUE) # Hummingbird survival rate lit review
-cjs <- read.csv("Patagona_Cormack-Jolly-Seber_04-06-21.csv", stringsAsFactors = TRUE) # capture history data 
+sl <- read.csv("0_raw_data/Table2_DigitalVersion_Hummingbird_Survival_Estimates_forR_04-15-21.csv", stringsAsFactors = TRUE) # Hummingbird survival rate lit review
+cjs <- read.csv("0_raw_data/Patagona_Cormack-Jolly-Seber_06-18-21_ForDryad.csv", stringsAsFactors = TRUE) # capture history data 
 str(cjs) # Check data structures
 # 'ch' capture histories must be characters! (And they're currently integers...)
 

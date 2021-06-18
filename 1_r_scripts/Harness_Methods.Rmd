@@ -1,7 +1,7 @@
 ---
 title: "Hummingbird Harness Methods"
 author: "Jessie Williamson"
-date: "Created 10/20/2020; last revised 06/17/21"
+date: "Created 10/20/2020; last revised 06/18/21"
 output: html_document
 ---
 
@@ -61,8 +61,8 @@ setwd("/Users/Jessie/Dropbox (MSBbirds)/Rdirectory/Hummingbird_Harness_Methods")
 # load in data 
 ```{R}
 # Read in Table 2 with brief recapture data for Giant Hummingbirds (part of Jessie Williamson's ongoing dissertation research)
-recaps <- read.csv("0_raw_data/Table2_harness_methods_recapture_data.csv", stringsAsFactors = TRUE) # n=7 geolocator individuals 
-recaps.reshape <- read.csv("0_raw_data/Table2_harness_methods_recapture_data_reshape.csv", stringsAsFactors = TRUE) # for plotting, below
+recaps <- read.csv("0_raw_data/Table1_DigitalVersion_harness_methods_recapture_data.csv", stringsAsFactors = TRUE) # n=7 geolocator individuals 
+recaps.reshape <- read.csv("0_raw_data/Table1_DigitalVersion_harness_methods_recapture_data_reshape.csv", stringsAsFactors = TRUE) # for plotting, below
 
 # Check data structure
 str(recaps)
