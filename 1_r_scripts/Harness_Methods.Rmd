@@ -12,6 +12,8 @@ Script includes:
 **2)** linear mixed effects models to test for effects of time of day and season, respectively, on body mass. 
 **3** Code to produce Figures S1 and S2
 
+Metadata for .csv data files used here is provided in each file's .xlsx version (see tab 2). 
+
 See accompanying script 'HarnessMethods_CJS.Rmd' for Cormack-Jolly-Seber survival model code and other plots. 
 
 
@@ -70,18 +72,7 @@ str(recaps.reshape)
 recaps.reshape$nk <- as.factor(recaps.reshape$nk)
 ```
 
-This is a micro-dataset, but here's what columns mean: 
-NK: NK number (MSB)
-Other_NK: Second NK assigned at collecting event (not always applicable; some birds have the same NK)
-device_ID: Geolocator ID 
-neck_loop: Harness neck loop measurement in mm 
-deployment_mass: Mass taken at time of deployment (g)
-recapture_mass: Mass taken at recapture (g) 
-mass_diff: Difference in mass (recapture minus deployment; aka, final minus initial)
-gain_loss: Direction of mass between deployment or recapture; categorical variable with 2 levels: "gain" or "loss"
-capture_time: Time of capture (24 hour format)
-capture_month: month of capture
-notes: notes pertaining to estimations of capture time (for some birds only)
+NOTE: See .xlsx file for metadata tab with column descriptions. 
 
 Note: I converted the "recaps" data frame into long format in Excel super quickly before beginning, but this can be done in R as well (and it's better to do it in R).
 

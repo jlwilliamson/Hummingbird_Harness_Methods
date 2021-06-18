@@ -11,6 +11,7 @@ Script includes:
 **1)** Code and extensive notations for Cormack-Jolly-Seber (CJS) models to estimate apparent survival and recapture probabilities from our geolocator birds *and* from our two satellite birds. AND, troubleshooting, diagnostic plots, and diagnostic test attempts. 
 **2)** Code to produce Figure 3 comparing published survival rates for hummingbirds. 
 
+Metadata for .csv data files used here is provided in each file's .xlsx version (see tab 2).
 
 **Background**
 Cormack-Jolly-Seber models are mark-recapture models used to estimate two parameters:
