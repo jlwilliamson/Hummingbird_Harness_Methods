@@ -1,7 +1,7 @@
 ---
 title: "Cormack-Jolly-Seber Mark-Recapture Models"
 author: "Jessie Williamson"
-date: "Created 4/3/2021; last revised 06/18/21 "
+date: "Created 4/3/2021; last revised 07/07/21 "
 output: html_document
 ---
 
@@ -456,7 +456,7 @@ test2cl_adult
 
 Let's put our survival rates into context by comparing them to the survival rates of other hummingbird species from the literature. 
 
-# Figure S3: Plot of point estimate comparison of hummingbird survival rates from the literature
+# Figure 3: Plot of point estimate comparison of hummingbird survival rates from the literature
 ```{r}
 # First set levels so data appears in proper order 
 
@@ -485,7 +485,7 @@ sl$common_name <- factor(sl$common_name
                                     "Hyacinth Visorbearer_M",
                                     "Giant Hummingbird"))
 
-FigureS3 <- ggplot(data=sl, aes(x=common_name, y=phi)) + 
+Figure3 <- ggplot(data=sl, aes(x=common_name, y=phi)) + 
       geom_hline(yintercept=0.42, linetype="longdash", size=0.4, color="red2", alpha=0.5) +
       geom_errorbar(aes(ymin=phi_lci, ymax=phi_uci), width=0.0, size=4.1, color="grey84") + # CI
       geom_errorbar(aes(ymin=phi-phi_se, ymax=phi+phi_se), width=0.13, size=1, color="gray28") + # se; purple 3 is pretty
@@ -505,14 +505,15 @@ FigureS3 <- ggplot(data=sl, aes(x=common_name, y=phi)) +
                                 "Phaethornis baroni","Augastes scutatus [7]", "Augastes scutatus [7]", "Patagona gigas")) +
       theme_classic() +     
       theme(axis.text.x=element_text(angle=45, hjust=1.0)) + 
+      theme(plot.margin = unit(c(0.2,0.2,0.2,0.4), "cm")) +  # top, right, bottom, left
           # ggtitle("(a)") + 
       theme(plot.title.position="plot", plot.title = element_text(face="bold")) + 
           # parameter "plot" specifies that you want "title" flush with y-axis; bold face makes panel header bold 
           # This is good for labeling figure panels! Avoids having to manually toy w/ hjust and vjust
       labs(x="Species", y = expression("Survival Estimate"~"("~italic(phi)~")")) + # Phi is supposedly italicized...
       theme(axis.title=element_text(size=12), axis.text.y=element_text(size=12), axis.text.x=element_text(size=10, face="italic")) # These go: y-axis title, y-axis ticks, x-axis species labels (italic)
-print(FigureS3)
-ggsave(FigureS3, filename="FigureS3_SurvivalRateComparison_04-29-21.pdf", height=7, width=9, units="in")
+print(Figure3)
+ggsave(Figure3, filename="Figure3_SurvivalRateComparison_07-07-21.pdf", height=7, width=9, units="in")
 
 # REFS: Charette et al. = [1]; Mulvihill et al. 1992 = [2]; Baumgartner 1989 = [3]; Hilton & Miller 2003 = [4]; 
 # Blake & Loiselle 2008 = [5]; Blake & Loiselle 2013 = [6]; Rodrigues et al. 2013 = [7]
